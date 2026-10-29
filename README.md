@@ -93,8 +93,8 @@ This project uses [PlatformIO](https://platformio.org/).
 
 ```bash
 # Clone the repository
-git clone https://github.com/smlara/AstroRoEn.git
-cd AstroRoEn
+git clone https://github.com/smlara/AstroK_Enfocador_Rotador.git
+cd AstroK_Enfocador_Rotador
 
 # Build and upload (NEMA 17 motor)
 pio run -e astrok-c3 -t upload
