@@ -238,7 +238,7 @@ namespace ASCOM.AstroK
             };
 
             // Sin esto, la única versión a la vista era la que respondía :GV#,
-            // que es el campo de dos dígitos de Moonlite y estaba fijo en "10".
+            // que es un campo de dos dígitos y estaba fijo en "10".
             _lblVersiones = new Label { Left = 195, Top = 684, Width = 235, ForeColor = Color.DimGray };
             foreach (string c in Textos.Idiomas) _cmbIdioma.Items.Add(Textos.NombreIdioma(c));
             _cmbIdioma.SelectedIndex = Array.IndexOf(Textos.Idiomas, Textos.Idioma);

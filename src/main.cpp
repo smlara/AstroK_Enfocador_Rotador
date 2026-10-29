@@ -283,7 +283,7 @@ void setup() {
     }
 
     // El arranque del WiFi bloquea varios segundos. Abrir el puerto USB
-    // resetea el ESP32, así que un cliente serie (driver ASCOM/Moonlite) que
+    // resetea el ESP32, así que un cliente serie (el driver ASCOM) que
     // conecte y pregunte de inmediato se comería ese silencio y daría
     // timeout: se atiende el protocolo durante esas esperas.
     alpacaServer.setTickCallback(atenderSerial);

@@ -10,7 +10,7 @@ extern Preferences preferences;
 #define HTTP_PORT 11111
 
 // Diagnóstico del arranque de WiFi por el puerto serie. Desactivado por
-// defecto porque ese puerto lo comparte el protocolo Moonlite: un cliente que
+// defecto porque ese puerto lo comparte el protocolo serie: un cliente que
 // abra el puerto (lo que resetea el ESP32 por el USB nativo) y consulte de
 // inmediato se encontraría este texto en vez de una respuesta limpia.
 // Para activarlo, compilar con -D DEBUG_WIFI.

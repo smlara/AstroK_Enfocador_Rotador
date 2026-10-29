@@ -220,7 +220,7 @@ extern long max_steps_global;
 #endif
 // Invierte el pin DIR: para cuando el cable del motor viene hecho y el
 // enfocador sale al revés. Se invierte en el pin y no en la posición, así que
-// todos los caminos (Moonlite, ALPACA, encoder, web) siguen coherentes.
+// todos los caminos (serie, ALPACA, encoder, web) siguen coherentes.
 // Ver aplicarSentido() en main.cpp, que sirve a los dos modos.
 #define DEFAULT_FOCUSER_REVERSE false
 #ifndef DEFAULT_FOCUSER_STALL_THRESHOLD
@@ -228,7 +228,7 @@ extern long max_steps_global;
 #endif
 // Tope absoluto del recorrido del enfocador, y valor de fabrica: el limite
 // real lo pone el usuario con max_steps, a la medida de su enfocador. Antes
-// era 65535 porque Moonlite transporta la posicion en 4 cifras hex; ahora el
+// era 65535 porque la posicion viajaba en 4 cifras hex; ahora el
 // protocolo serie manda las que hagan falta (ver enviarRespuestaHex). 999999
 // son 6 cifras, lo que cabe en la pantalla y en los campos de la web.
 #define MAX_FOCUSER_STEPS 999999L

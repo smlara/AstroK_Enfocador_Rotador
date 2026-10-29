@@ -1,16 +1,16 @@
 # Driver ASCOM para AstroK (enfocador, USB)
 
-Driver `IFocuserV3` que habla el protocolo serie compatible Moonlite del firmware.
+Driver `IFocuserV3` que habla el protocolo serie propio del firmware.
 
 **Estado: compilado y probado contra la placa real.** Conecta, lee posición, mueve el motor con
 su rampa de aceleración, reporta `IsMoving` y para con `Halt()`.
 
 ## Por qué existe
 
-El firmware Moonlite del dispositivo funciona correctamente — verificado por serie:
-`:GV#`→`10#`, `:GP#`/`:GN#`/`:GI#` correctos, y `:SN####`+`:FG#` mueve el motor. Pero **ningún
-driver Moonlite genérico consigue conectar** con la variante ESP32‑C3, y el motivo no es el
-protocolo:
+El firmware del dispositivo responde correctamente por serie:
+`:GV#`→`10#`, `:GP#`/`:GN#`/`:GI#` correctos, y `:SN####`+`:FG#` mueve el motor. Ningún driver
+genérico de terceros sirve: el protocolo no es compatible con ninguno, y además la variante
+ESP32‑C3 tiene un problema propio con el USB:
 
 El C3 no tiene USB‑OTG; usa el periférico **USB Serial/JTAG**, que solo entrega datos cuando el
 host aserta **DTR**. Medido sobre la placa, con las cuatro combinaciones:
@@ -157,7 +157,7 @@ detalle: la DLL se llama `ASCOM.DeviceInterfaces.dll` (plural) pero el *namespac
 
 ## Extensiones del protocolo
 
-Además de Moonlite, el firmware acepta estos comandos propios (ver `FocuserProtocol.h`):
+El firmware acepta además estos comandos (ver `FocuserProtocol.h`):
 
 | Comando | Qué hace |
 |---|---|
@@ -244,7 +244,7 @@ son los delimitadores del protocolo, y romperían el marcado. Probado con
 
 ## Notas de implementación
 
-- **Posición máxima**: Moonlite transporta la posición en 4 cifras hex (65535 como mucho). Desde
+- **Posición máxima**: antes la posición viajaba en 4 cifras hex (65535 como mucho). Desde
   la 1.4 el firmware manda al menos 4 y las que hagan falta, así que el tope es
   `DeviceLink.MaxPasosEnfocador` (999999, igual que `MAX_FOCUSER_STEPS` del firmware). Al
   conectar se lee el `max_steps` real del equipo con `:CG#`; el valor del perfil ASCOM es solo
@@ -265,5 +265,5 @@ son los delimitadores del protocolo, y romperían el marcado. Probado con
 
 El firmware también expone **ASCOM ALPACA** por WiFi (con descubrimiento UDP), que N.I.N.A.
 encuentra solo y no necesita ni driver ni cable. Este driver existe para tener una vía cableada
-y fiable cuando el WiFi no es una opción — y en la variante C3, para que Moonlite funcione
-siquiera.
+y fiable cuando el WiFi no es una opción — y en la variante C3, para que el USB funcione
+siquiera (DTR).

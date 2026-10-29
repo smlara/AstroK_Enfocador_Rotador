@@ -11,7 +11,7 @@ namespace ASCOM.AstroK
 {
     /// <summary>
     /// Driver ASCOM de rotador para AstroK sobre el mismo protocolo serie
-    /// compatible Moonlite que el enfocador.
+    /// que el enfocador.
     ///
     /// Enfocador y rotador son productos distintos (mecánica y forma propias)
     /// aunque compartan electrónica y firmware, así que cada uno tiene su
@@ -34,7 +34,7 @@ namespace ASCOM.AstroK
         private const string ComPortProfileName = "COM Port";
         private const string ComPortDefault = "COM5";
 
-        // Cero lógico del rotador en el protocolo Moonlite (ver FocuserProtocol).
+        // Cero lógico del rotador en el protocolo serie (ver FocuserProtocol).
         private const int CeroProtocolo = 32768;
 
         private readonly DeviceLink _link = new DeviceLink();
@@ -272,7 +272,7 @@ namespace ASCOM.AstroK
 
         public string DriverInfo
         {
-            get { return DriverDescriptionText + " - Moonlite protocol over USB CDC (DTR/RTS asserted)"; }
+            get { return DriverDescriptionText + " - serial protocol over USB CDC (DTR/RTS asserted)"; }
         }
 
         // ASCOM define DriverVersion como "m.n": solo major y minor. Por eso

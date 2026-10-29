@@ -11,12 +11,12 @@ namespace ASCOM.AstroK
 {
     /// <summary>
     /// Driver ASCOM de enfocador para AstroK (AstroRoEn) sobre su protocolo
-    /// serie compatible Moonlite.
+    /// serie por USB.
     ///
     /// Existe por un motivo muy concreto: el ESP32-C3 usa su periférico USB
     /// Serial/JTAG, que solo entrega datos cuando el host aserta DTR. La clase
     /// SerialPort de .NET tiene DtrEnable y RtsEnable en false por defecto, así
-    /// que los drivers Moonlite genéricos abren el puerto y no reciben un solo
+    /// que los drivers serie genéricos abren el puerto y no reciben un solo
     /// byte. Ver OpenPort(): ahí está toda la diferencia.
     /// </summary>
     [Guid("5f5a2d7c-9c1e-4f7a-9d3b-1a2c4e6f8b90")]
@@ -195,7 +195,7 @@ namespace ASCOM.AstroK
 
         public string DriverInfo
         {
-            get { return DriverDescriptionText + " - Moonlite protocol over USB CDC (DTR/RTS asserted)"; }
+            get { return DriverDescriptionText + " - serial protocol over USB CDC (DTR/RTS asserted)"; }
         }
 
         // ASCOM define DriverVersion como "m.n": solo major y minor. Por eso

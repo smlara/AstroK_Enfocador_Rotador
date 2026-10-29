@@ -3,7 +3,7 @@
 [![License: GPL v3](https://img.shields.io/badge/Firmware-GPL%20v3-blue.svg)](LICENSE)
 [![License: CERN OHL v2-S](https://img.shields.io/badge/Hardware-CERN%20OHL%20v2--S-orange.svg)](LICENSE-HARDWARE)
 [![Platform: ESP32-C3](https://img.shields.io/badge/Plataforma-ESP32--C3-teal.svg)](https://www.espressif.com/)
-[![Protocol: ASCOM](https://img.shields.io/badge/Protocolo-ASCOM%20%7C%20ALPACA%20%7C%20Moonlite-lightgrey.svg)]()
+[![Protocol: ASCOM](https://img.shields.io/badge/Protocolo-ASCOM%20%7C%20ALPACA-lightgrey.svg)]()
 
 > **[English version](README.md)**
 
@@ -15,7 +15,7 @@ Controlador DIY totalmente open-source para un **enfocador** de telescopio o un 
 
 - **Enfocador o rotador** — una placa, un firmware; el modo lo decide un jumper
 - **Driver ASCOM para Windows** (USB) y **ASCOM ALPACA** (WiFi, con descubrimiento)
-- **Protocolo serie compatible con Moonlite** por USB
+- **Protocolo serie propio** por USB, el que usa el driver ASCOM
 - **Control manual** mediante encoder rotatorio (x10 / x100 / x500 pasos, o x0,1° / x1° en modo rotador)
 - **Pantalla OLED** (128×32) que muestra la posición y el paso activo
 - **Página web de configuración** servida por el propio equipo (inglés / español)
@@ -79,7 +79,7 @@ El diseño de la PCB y la lista de materiales están en [pcb/](pcb/).
 
 | Interfaz | Detalles |
 |----------|----------|
-| USB serie | **115200 bps**, comandos compatibles con Moonlite (`:GP#`, `:SN…#`, `:FG#`, `:FQ#`…) |
+| USB serie | **115200 bps**, juego de comandos propio que usa el driver ASCOM |
 | ASCOM ALPACA | HTTP en el puerto **11111**, descubrimiento UDP en el puerto **32227** |
 | Configuración web | `http://<ip-del-equipo>/` |
 

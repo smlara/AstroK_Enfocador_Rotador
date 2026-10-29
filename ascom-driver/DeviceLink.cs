@@ -6,8 +6,8 @@ using System.Text;
 namespace ASCOM.AstroK
 {
     /// <summary>
-    /// Capa de transporte con el dispositivo: protocolo Moonlite más las
-    /// extensiones AstroK (:CG#, :CS#, :CR#, :WI#, :WR#).
+    /// Capa de transporte con el dispositivo: protocolo serie del firmware,
+    /// incluidas las extensiones (:CG#, :CS#, :CR#, :WI#, :WR#).
     ///
     /// La usan tanto el driver como la ventana de configuración, que necesita
     /// hablar con el equipo estando el driver desconectado.
@@ -40,7 +40,7 @@ namespace ASCOM.AstroK
                     // ---- LO IMPORTANTE ----
                     // El USB Serial/JTAG del ESP32-C3 solo entrega datos con DTR
                     // asertado. Sin estas dos líneas el equipo queda mudo: es
-                    // exactamente lo que le pasa a los drivers Moonlite genéricos.
+                    // exactamente lo que les pasa a los drivers serie genéricos.
                     DtrEnable = true,
                     RtsEnable = true
                 };
@@ -116,11 +116,11 @@ namespace ASCOM.AstroK
             }
         }
 
-        // ---- Moonlite ----
+        // ---- Posición y movimiento ----
 
         /// <summary>
         /// Tope del recorrido del enfocador, igual que MAX_FOCUSER_STEPS en el
-        /// firmware. Moonlite lo dejaba en 65535 porque manda 4 cifras hex; el
+        /// firmware. Antes era 65535 porque se mandaban 4 cifras hex; el
         /// firmware ahora manda las que hagan falta, y aquí se leen y escriben
         /// enteras ("X4" pone 4 como mínimo, no como máximo).
         /// </summary>
@@ -164,7 +164,7 @@ namespace ASCOM.AstroK
         }
 
         /// <summary>
-        /// Versión completa del firmware ("1.2"), vía :DV#. El :GV# de Moonlite
+        /// Versión completa del firmware ("1.2"), vía :DV#. El :GV#
         /// solo da dos dígitos ("12") porque el protocolo lo define así, y eso
         /// es lo que se veía antes en la ventana. Devuelve cadena vacía si el
         /// firmware es anterior a :DV#.

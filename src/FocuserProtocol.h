@@ -5,7 +5,7 @@
 #include <AccelStepper.h>
 
 /*
- * === MOONLITE COMPATIBLE SERIAL PROTOCOL ===
+ * === PROTOCOLO SERIE ASTROK ===
  * Protocol format: :[COMMAND][PARAMS]#
  * 
  * === GETTERS (GET) ===
@@ -30,7 +30,7 @@
  * :FG#     -> Full Go (Initiates move, though firmware starts move on SN)
  * :+#      -> Temperature Compensation Activate (Ignored)
  *
- * === EXTENSIONES ASTROK (fuera del estándar Moonlite) ===
+ * === EXTENSIONES ASTROK ===
  * Las usa el diálogo de configuración del driver ASCOM. Existen porque la
  * configuración de red solo era accesible por HTTP, lo que no sirve cuando
  * precisamente la WiFi es lo que hay que configurar o reparar.

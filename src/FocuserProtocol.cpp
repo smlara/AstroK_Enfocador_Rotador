@@ -89,12 +89,12 @@ void FocuserProtocol::ejecutarComando(String cmd) {
         cmd.remove(0, 1);
     }
     
-    // Moonlite commands can be just 2 chars (e.g., GT, GI, GV) or contain params
+    // Commands can be just 2 chars (e.g., GT, GI, GV) or contain params
     if (cmd.length() < 2) return;
 
     // Solo el código de 2 letras se normaliza a mayúsculas. Los parámetros NO:
     // el base64 de :CS# distingue mayúsculas de minúsculas y pasarlo entero a
-    // mayúsculas lo corrompía. Los parámetros hex de Moonlite no se ven
+    // mayúsculas lo corrompía. Los parámetros hex no se ven
     // afectados porque strtol() acepta ambas cajas.
     String codigo = cmd.substring(0, 2);
     codigo.toUpperCase();
@@ -103,15 +103,15 @@ void FocuserProtocol::ejecutarComando(String cmd) {
     // 2. Máquina de estados / Despachador (Switch por primera letra)
     switch (codigo[0]) {
         case 'G': // GETTERS
-            // Moonlite define :GV# como dos digitos, asi que aqui va "14" y no
+            // :GV# es de dos digitos, asi que aqui va "14" y no
             // "1.4": hay clientes que parsean exactamente dos caracteres. Para
             // la version completa y legible esta :DV#, que usa la app propia.
             // Mantener sincronizado con custom_version de platformio.ini.
-            if (codigo == "GV") { Serial.print("14#"); } // Moonlite: version 1.4
+            if (codigo == "GV") { Serial.print("14#"); } // version 1.4
             else if (codigo == "GP") {
                 long pos = _stepper.currentPosition();
                 if (_isRotator) {
-                    // Mapeo especial para Moonlite Rotator: 32768 es el punto 0 lógico
+                    // Mapeo especial del rotador: 32768 es el punto 0 lógico
                     long posLogica = (pos - POSICION_CENTRAL) + 32768L;
                     enviarRespuestaHex(posLogica);
                 } else {
@@ -143,13 +143,13 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                     long nuevaPos = strtol(params.c_str(), NULL, 16);
                     
                     if (_isRotator) {
-                        // El cliente Moonlite envía una posición absoluta desplazada respecto a 32768.
+                        // El cliente envía una posición absoluta desplazada respecto a 32768.
                         // 32768 en el protocolo = 0 en nuestro sistema interno.
                         long targetLogicalSteps = nuevaPos - 32768L;
                         
                         long pasosPorVuelta = (long)round(360.0 * PASOS_POR_GRADO);
                         
-                        // Normalización circular para el protocolo Moonlite
+                        // Normalización circular de la posición del rotador
                         targetLogicalSteps %= pasosPorVuelta;
                         if (targetLogicalSteps < 0) targetLogicalSteps += pasosPorVuelta;
 
@@ -163,7 +163,7 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 if (params.length() > 0) {
                     long p = strtol(params.c_str(), NULL, 16);
                     if (_isRotator) {
-                        // Sync: Moonlite envía 'p' (donde 32768 es 0 deg)
+                        // Sync: el cliente envía 'p' (donde 32768 es 0 deg)
                         long targetLogicalSteps = p - 32768L;
                         
                         long pasosPorVuelta = (long)round(360.0 * PASOS_POR_GRADO);
@@ -192,7 +192,7 @@ void FocuserProtocol::ejecutarComando(String cmd) {
             else if (codigo == "FG") { /* El movimiento ya lo gestiona el loop */ }
             break;
 
-        // --- Extensiones AstroK (fuera del estándar Moonlite) ---
+        // --- Extensiones AstroK ---
         // Existen porque la configuración de red solo era accesible por HTTP, y
         // eso no sirve precisamente cuando la WiFi es lo que hay que arreglar.
         // Las usa el diálogo de configuración del driver ASCOM por USB.
@@ -241,7 +241,7 @@ void FocuserProtocol::ejecutarComando(String cmd) {
             }
             else if (codigo == "DV") {
                 // Version completa del firmware, sin el corse de dos digitos
-                // de Moonlite. La app la muestra tal cual.
+                // de :GV#. La app la muestra tal cual.
                 Serial.print(FW_VERSION);
                 Serial.print("#");
             }
@@ -297,11 +297,9 @@ void FocuserProtocol::ejecutarComando(String cmd) {
 }
 
 void FocuserProtocol::enviarRespuestaHex(long valor) {
-    // Moonlite manda siempre 4 cifras hex (16 bits), lo que cortaba el
+    // Antes se mandaban siempre 4 cifras hex (16 bits), lo que cortaba el
     // recorrido del enfocador en 65535 pasos. Aqui van al menos 4 y las que
-    // hagan falta por encima: hasta 0xFFFF la respuesta es identica a la de
-    // Moonlite y los clientes antiguos no notan nada; por encima solo la
-    // entiende quien lea el hex entero, como el driver propio. Un negativo
+    // hagan falta por encima, y el driver lee el hex entero. Un negativo
     // sale en complemento a 2 de 32 bits (8 cifras), que es lo que da
     // int.Parse(..., HexNumber) en el driver.
     char hex[12];
