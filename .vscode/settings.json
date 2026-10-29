@@ -1,0 +1,14 @@
+{
+    "C_Cpp.errorSquiggles": "disabled",
+    "files.exclude": {
+        "**/.pio": true,
+        "**/.vscode": false
+    },
+    "files.watcherExclude": {
+        "**/.pio/**": true
+    },
+    "search.exclude": {
+        "**/.pio": true
+    },
+    "C_Cpp.intelliSenseEngine": "default"
+}

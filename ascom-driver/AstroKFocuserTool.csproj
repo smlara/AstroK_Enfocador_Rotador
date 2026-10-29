@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Herramienta independiente de configuración.
+
+  Solo aporta el punto de entrada: toda la lógica vive en la DLL del driver,
+  que es la misma que usa ASCOM. Referencia ensamblados de ASCOM porque la DLL
+  los necesita para el tipo Focuser, pero la ventana de configuración en sí no
+  toca la plataforma: habla con el equipo por USB.
+-->
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{2D9F7A51-8C43-4E16-9B72-6F1A3C5D8E42}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>ASCOM.AstroK</RootNamespace>
+    <AssemblyName>AstroKFocuser</AssemblyName>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <StartupObject>ASCOM.AstroK.StandaloneApp</StartupObject>
+    <ApplicationIcon>AstroKFocuser.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="AstroKFocuser.csproj">
+      <Project>{7C3E1A64-2B55-4D0E-9F1A-3C5D7E9B1A20}</Project>
+      <Name>AstroKFocuser</Name>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="AssemblyVersionInfo.cs" />
+    <Compile Include="AssemblyInfoFocuser.cs" />
+    <Compile Include="StandaloneApp.cs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

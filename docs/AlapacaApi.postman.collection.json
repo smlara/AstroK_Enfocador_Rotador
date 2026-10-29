@@ -1,0 +1,53 @@
+{
+	"info": {
+		"name": "Alpaca ESP32 - Full API Corrected",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Management",
+			"item": [
+				{ "name": "API Versions", "request": { "method": "GET", "url": "http://{{baseUrl}}/management/apiversions" } },
+				{ "name": "Server Description", "request": { "method": "GET", "url": "http://{{baseUrl}}/management/v1/description" } },
+				{ "name": "Configured Devices", "request": { "method": "GET", "url": "http://{{baseUrl}}/management/v1/configureddevices" } }
+			]
+		},
+		{
+			"name": "Focuser (0)",
+			"item": [
+				{ "name": "Connected GET", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/focuser/0/connected" } },
+				{ "name": "Connected PUT", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "Connected", "value": "true" }] }, "url": "http://{{baseUrl}}/api/v1/focuser/0/connected" } },
+				{ "name": "Position", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/focuser/0/position" } },
+				{ "name": "IsMoving", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/focuser/0/ismoving" } },
+				{ "name": "Temperature", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/focuser/0/temperature" } },
+				{ "name": "MaxStep", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/focuser/0/maxstep" } },
+				{ "name": "Move (Absolute)", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "Position", "value": "5000" }, { "key": "ClientID", "value": "1" }, { "key": "ClientTransactionID", "value": "1" }] }, "url": "http://{{baseUrl}}/api/v1/focuser/0/move" } },
+				{ "name": "Halt", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "ClientID", "value": "1" }] }, "url": "http://{{baseUrl}}/api/v1/focuser/0/halt" } }
+			]
+		},
+		{
+			"name": "Rotator (0)",
+			"item": [
+				{ "name": "Position", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/rotator/0/position" } },
+				{ "name": "IsMoving", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/rotator/0/ismoving" } },
+				{ "name": "TargetPosition", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/rotator/0/targetposition" } },
+				{ "name": "Move Absolute", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "Position", "value": "180.5" }] }, "url": "http://{{baseUrl}}/api/v1/rotator/0/moveabsolute" } },
+				{ "name": "Move Relative", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "Position", "value": "10.0" }] }, "url": "http://{{baseUrl}}/api/v1/rotator/0/move" } },
+				{ "name": "Reverse GET", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/v1/rotator/0/reverse" } },
+				{ "name": "Reverse PUT", "request": { "method": "PUT", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "Reverse", "value": "false" }] }, "url": "http://{{baseUrl}}/api/v1/rotator/0/reverse" } },
+				{ "name": "Halt", "request": { "method": "PUT", "url": "http://{{baseUrl}}/api/v1/rotator/0/halt" } }
+			]
+		},
+		{
+			"name": "Setup & Config",
+			"item": [
+				{ "name": "Get Config", "request": { "method": "GET", "url": "http://{{baseUrl}}/api/setup/config" } },
+				{ "name": "Save Config", "request": { "method": "POST", "body": { "mode": "urlencoded", "urlencoded": [{ "key": "config_param", "value": "value" }] }, "url": "http://{{baseUrl}}/api/setup/config" } },
+				{ "name": "Reset Position", "request": { "method": "POST", "url": "http://{{baseUrl}}/api/setup/reset" } }
+			]
+		}
+	],
+	"variable": [
+		{ "key": "baseUrl", "value": "192.168.4.1" }
+	]
+}

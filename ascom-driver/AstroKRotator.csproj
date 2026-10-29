@@ -1,0 +1,86 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A81F3C29-6D74-4B55-9E03-2C7A5F1D8B46}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>ASCOM.AstroK</RootNamespace>
+    <AssemblyName>ASCOM.AstroK.Rotator</AssemblyName>
+    <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <!-- El driver se expone por COM; el registro lo hace regasm (ver README).
+         Rotador: producto distinto, DLL y ProgID propios para que ambos
+         puedan convivir instalados. -->
+    <RegisterForComInterop>false</RegisterForComInterop>
+    <ComVisible>true</ComVisible>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <OutputPath>bin\ReleaseRot\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <OutputPath>bin\DebugRot\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <Optimize>false</Optimize>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AscomComponents>$(ProgramFiles) (x86)\ASCOM\Platform 6 Developer Components\Components\Platform6</AscomComponents>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <!-- JavaScriptSerializer: el JSON de configuración del equipo. .NET
+         Framework no trae System.Text.Json. -->
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Management" />
+    <Reference Include="ASCOM.DeviceInterfaces">
+      <HintPath>C:\Program Files (x86)\ASCOM\Platform 6 Developer Components\Components\Platform6\ASCOM.DeviceInterfaces.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ASCOM.Utilities">
+      <HintPath>C:\Program Files (x86)\ASCOM\Platform 6 Developer Components\Components\Platform6\ASCOM.Utilities.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ASCOM.Exceptions">
+      <HintPath>C:\Program Files (x86)\ASCOM\Platform 6 Developer Components\Components\Platform6\ASCOM.Exceptions.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ASCOM.Attributes">
+      <HintPath>C:\Program Files (x86)\ASCOM\Platform 6 Developer Components\Components\Platform6\ASCOM.Attributes.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="AstroKRotator.ico" />
+    <EmbeddedResource Include="locales\es.json" />
+    <EmbeddedResource Include="locales\en.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="AssemblyVersionInfo.cs" />
+    <Compile Include="AssemblyInfoRotator.cs" />
+    <Compile Include="BuscadorEquipos.cs" />
+    <Compile Include="DeviceLink.cs" />
+    <Compile Include="Firmware.cs" />
+    <Compile Include="Textos.cs" />
+    <Compile Include="Rotator.cs" />
+    <Compile Include="SetupDialogForm.cs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
