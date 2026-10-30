@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Preferences.h>
+#include "BleLink.h"
 
 extern Preferences preferences;
 
@@ -1020,6 +1021,7 @@ void AlpacaServer::handleSetConfig() {
 
 void AlpacaServer::handleFactoryReset() {
     preferences.remove("config");
+    bleLink.olvidarEmparejamientos(); // como :CR#
     server->send(200, "application/json", "{\"status\":\"ok\", \"message\":\"Config erased. Rebooting...\"}");
     delay(500);
     ESP.restart();

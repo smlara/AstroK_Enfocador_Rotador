@@ -61,6 +61,7 @@ namespace ASCOM.AstroK
         private NumericUpDown _numTimeout;
         private NumericUpDown _numRetries;
         private CheckBox _chkWifi;
+        private CheckBox _chkBle;
         private DataGridView _gridRedes;
 
         private ComboBox _cmbIdioma;
@@ -725,7 +726,9 @@ namespace ASCOM.AstroK
             _numRetries = new NumericUpDown { Left = 285, Top = 109, Width = 60, Minimum = 1, Maximum = 100 };
             // Apagado, el equipo arranca sin esperar al WiFi y solo se maneja
             // por USB. Lo guarda el mismo botón "Guardar y reiniciar".
-            _chkWifi = new CheckBox { Tag = "wifi.activado", Left = 370, Top = 110, Width = 200, Checked = true };
+            _chkWifi = new CheckBox { Tag = "wifi.activado", Left = 360, Top = 110, Width = 100, Checked = true };
+            // Igual con el Bluetooth: apagado, el equipo ni se anuncia.
+            _chkBle = new CheckBox { Tag = "wifi.bleActivado", Left = 460, Top = 110, Width = 125, Checked = true };
 
             var lblRedes = new Label { Tag = "wifi.redes", Left = 15, Top = 145, Width = 555 };
             _gridRedes = new DataGridView
@@ -758,7 +761,7 @@ namespace ASCOM.AstroK
 
             tab.Controls.AddRange(new Control[] {
                 lblIpTitulo, _lblIp, btnIp, sep, lblAp, lblApNombre, _txtApNombre, lblApPass, _txtApPass,
-                lblTimeout, _numTimeout, lblRetries, _numRetries, _chkWifi, lblRedes, _gridRedes,
+                lblTimeout, _numTimeout, lblRetries, _numRetries, _chkWifi, _chkBle, lblRedes, _gridRedes,
                 btnQuitar, btnRecargar, btnGuardar, nota
             });
         }
@@ -800,8 +803,15 @@ namespace ASCOM.AstroK
                     return;
                 }
 
+                // Apagar el Bluetooth estando conectado por él deja sin esta
+                // vía en cuanto el equipo reinicie.
+                if (_link.EsBluetooth && !_chkBle.Checked
+                    && !Preguntar(Textos.Get("ble.confirmarApagar"), MessageBoxIcon.Warning))
+                    return;
+
                 if (_config == null) _config = LeerConfig();
                 var wifi = ObtenerSeccion(_config, "wifi");
+                ObtenerSeccion(_config, "ble")["enabled"] = _chkBle.Checked;
 
                 wifi["ap_name"] = _txtApNombre.Text;
                 wifi["ap_password"] = pass;
@@ -1431,7 +1441,10 @@ namespace ASCOM.AstroK
             ActualizarHabilitacion();
         }
 
-        private void AlternarConexion()
+        /// <param name="trasEmparejar">Viene de emparejar: si aun así el
+        /// equipo no acepta el vínculo, se informa en vez de volver a pedir
+        /// el PIN en bucle.</param>
+        private void AlternarConexion(bool trasEmparejar = false)
         {
             if (_link.IsOpen)
             {
@@ -1451,6 +1464,7 @@ namespace ASCOM.AstroK
                 return;
             }
 
+            bool emparejar = false;
             try
             {
                 Cursor = Cursors.WaitCursor;
@@ -1479,6 +1493,7 @@ namespace ASCOM.AstroK
             catch (Exception ex)
             {
                 _link.Close();
+                emparejar = ex is BleSinEmparejarException && !trasEmparejar;
                 _lblEstado.Tag = null;
                 _lblEstado.Text = string.Format(Textos.Get("foco.noConecta"), ex.Message);
                 _lblEstado.ForeColor = Color.Firebrick;
@@ -1488,6 +1503,82 @@ namespace ASCOM.AstroK
                 Cursor = Cursors.Default;
                 ActualizarHabilitacion();
                 ActualizarTextoConectar();
+            }
+
+            if (emparejar) EmparejarYConectar();
+        }
+
+        /// <summary>
+        /// Empareja por Bluetooth y, si sale bien, conecta. El equipo enseña
+        /// un PIN en su pantalla y aquí se pide. Va en segundo plano porque
+        /// Windows pide el PIN desde otro hilo y espera la respuesta: con la
+        /// ventana bloqueada no habría forma de enseñar el diálogo.
+        /// </summary>
+        private void EmparejarYConectar()
+        {
+            string puerto = ComPort;
+            _buscando = true; // bloquea buscar y conectar mientras tanto
+            ActualizarHabilitacion();
+            _lblEstado.Tag = "ble.emparejando";
+            _lblEstado.Text = Textos.Get("ble.emparejando");
+            _lblEstado.ForeColor = Color.DimGray;
+
+            System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                string fallo = null;
+                bool cancelado = false;
+                try { BleCanal.Emparejar(puerto, () => (string)Invoke(new Func<string>(PedirPin))); }
+                catch (OperationCanceledException) { cancelado = true; }
+                catch (Exception ex) { fallo = ex.Message; }
+
+                if (IsDisposed || !IsHandleCreated) return;
+                try
+                {
+                    BeginInvoke((Action)(() =>
+                    {
+                        _buscando = false;
+                        ActualizarHabilitacion();
+                        if (cancelado)
+                        {
+                            _lblEstado.Tag = "foco.desconectado";
+                            _lblEstado.Text = Textos.Get("foco.desconectado");
+                            _lblEstado.ForeColor = Color.DimGray;
+                        }
+                        else if (fallo != null)
+                        {
+                            _lblEstado.Tag = null;
+                            _lblEstado.Text = string.Format(Textos.Get("ble.errEmparejar"), fallo);
+                            _lblEstado.ForeColor = Color.Firebrick;
+                        }
+                        else AlternarConexion(true);
+                    }));
+                }
+                catch (ObjectDisposedException) { }
+            });
+        }
+
+        /// <summary>Pide el PIN que enseña el equipo. null si se cancela.</summary>
+        private string PedirPin()
+        {
+            using (var f = new Form
+            {
+                Text = Text,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MinimizeBox = false,
+                MaximizeBox = false,
+                ShowInTaskbar = false,
+                ClientSize = new Size(340, 130)
+            })
+            {
+                var lbl = new Label { Text = Textos.Get("ble.pinTexto"), Left = 12, Top = 12, Width = 316, Height = 34 };
+                var txt = new TextBox { Left = 12, Top = 52, Width = 120, MaxLength = 4, Font = new Font(Font.FontFamily, 14) };
+                var ok = new Button { Text = Textos.Get("ventana.aceptar"), Left = 158, Top = 94, Width = 80, DialogResult = DialogResult.OK };
+                var cancelar = new Button { Text = Textos.Get("ventana.cancelar"), Left = 248, Top = 94, Width = 80, DialogResult = DialogResult.Cancel };
+                f.Controls.AddRange(new Control[] { lbl, txt, ok, cancelar });
+                f.AcceptButton = ok;
+                f.CancelButton = cancelar;
+                return f.ShowDialog(this) == DialogResult.OK ? txt.Text : null;
             }
         }
 
@@ -1533,6 +1624,11 @@ namespace ASCOM.AstroK
             _numRetries.Value = Acotar(_numRetries, Convert.ToInt32(Valor(wifi, "retries", 10)));
             // Sin la clave (firmware anterior a 1.4.3) el WiFi está encendido.
             _chkWifi.Checked = Convert.ToBoolean(Valor(wifi, "enabled", true));
+            // Sin la sección (firmware anterior a 1.5) no hay Bluetooth que
+            // apagar; marcada no cambia nada.
+            object ble;
+            _chkBle.Checked = !_config.TryGetValue("ble", out ble) || !(ble is Dictionary<string, object>)
+                || Convert.ToBoolean(Valor((Dictionary<string, object>)ble, "enabled", true));
 
             _gridRedes.Rows.Clear();
             var redes = Valor(wifi, "networks", null) as ArrayList;

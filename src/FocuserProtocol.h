@@ -7,6 +7,8 @@
 /*
  * === PROTOCOLO SERIE ASTROK ===
  * Protocol format: :[COMMAND][PARAMS]#
+ * Llega por USB y, con los mismos comandos, por BLE (ver BleLink.h). La
+ * respuesta sale por el canal que trajo el comando.
  * 
  * === GETTERS (GET) ===
  * :GV#    -> Get Version (Returns 10#)
@@ -39,7 +41,8 @@
  *                /api/setup/config) codificado en base64, terminado en '#'.
  * :CS<b64>#   -> Set Config. Recibe ese JSON en base64, lo valida y lo guarda.
  *                Responde OK# o ER#. Los cambios de WiFi piden reinicio.
- * :CR#        -> Reset de fábrica: borra la configuración de NVS y reinicia.
+ * :CR#        -> Reset de fábrica: borra la configuración de NVS y los
+ *                emparejamientos BLE, y reinicia.
  *                Responde OK# antes de reiniciar. El siguiente arranque
  *                recrea los valores por defecto.
  * :DM#        -> Modo en que arrancó el equipo: "FOCUSER#" o "ROTATOR#". Lo
@@ -69,6 +72,8 @@ public:
     FocuserProtocol(AccelStepper& stepper, long& targetPos, bool& isRotatorRef, bool& rotatorReverseRef);
     
     void procesarSerial();
+    // Los mismos comandos por BLE (ver BleLink.h).
+    void procesarBle();
 
     // Se invoca tras guardar la configuración con :CS#. Permite que los
     // parámetros del motor (corriente, micropasos, sensibilidad del stall) se
@@ -89,8 +94,12 @@ private:
     bool& _isRotator;
     bool& _rotatorReverse;
     String _buffer;
+    String _bufferBle;
     void (*_onConfigApplied)();
+    // Canal por el que llegó el comando en curso: ahí va la respuesta.
+    Print* _out;
 
+    void procesarCanal(Stream& canal, String& buffer);
     void ejecutarComando(String cmd);
     void enviarRespuestaHex(long valor);
     void atenderActualizacion(const String& codigo, const String& params);

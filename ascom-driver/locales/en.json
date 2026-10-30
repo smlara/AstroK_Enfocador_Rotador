@@ -7,7 +7,7 @@
   "ventana.cerrar": "Close",
   "tab.enfocador": "Focuser",
   "tab.avanzados": "Advanced",
-  "tab.wifi": "WiFi",
+  "tab.wifi": "WiFi / Bluetooth",
   "foco.puerto": "COM port:",
   "foco.conectar": "Connect",
   "foco.desconectar": "Disconnect",
@@ -80,9 +80,9 @@
   "ventana.versiones": "App {0}  ·  Firmware {1}",
   "ventana.appNueva": "A new version of the app is available: {0}. Click here to download the installer.",
   "foco.buscar": "Scan",
-  "foco.buscando": "Looking for the device on the USB ports...",
+  "foco.buscando": "Looking for the device over USB and Bluetooth...",
   "foco.encontrados": "Found {0} device(s). Pick one and press Connect.",
-  "foco.ningunEquipo": "No device found. Check the cable, or pick the port by hand.",
+  "foco.ningunEquipo": "No device found. Check the cable or Bluetooth, or pick the port by hand.",
   "tab.firmware": "Firmware update",
   "fw.sinConexion": "Connect the device on the first tab to see which firmware it runs.",
   "fw.sinSoporte": "The device firmware ({0}) cannot be updated over USB.\nFlash it once with flash.ps1; later updates can be done from here.",
@@ -122,5 +122,10 @@
   "fw.confirmarMotor": "This firmware is for the {0} motor, but the device runs the one for the {1} motor.\n\nFlash it only if you have changed the motor. Continue?",
   "fw.confirmarVersion": "The selected version ({0}) is not newer than the device's ({1}).\n\nFlash it anyway?",
   "fw.confirmar": "{0} is about to be flashed to the device.\n\nDo not unplug the USB until it finishes; the device will restart by itself.\n\nContinue?",
-  "fw.noCerrar": "The firmware is being flashed. Wait for it to finish before closing the window."
+  "fw.noCerrar": "The firmware is being flashed. Wait for it to finish before closing the window.",
+  "wifi.bleActivado": "Bluetooth enabled",
+  "ble.emparejando": "Pairing over Bluetooth: type the PIN shown on the device display.",
+  "ble.pinTexto": "Type the 4-digit PIN now shown\non the device display:",
+  "ble.errEmparejar": "Pairing failed: {0}",
+  "ble.confirmarApagar": "You are connected over Bluetooth. If you turn it off, after the restart\nyou will only be able to connect over USB or WiFi.\n\nContinue?"
 }

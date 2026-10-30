@@ -7,7 +7,7 @@
   "ventana.cerrar": "Cerrar",
   "tab.enfocador": "Enfocador",
   "tab.avanzados": "Avanzados",
-  "tab.wifi": "WiFi",
+  "tab.wifi": "WiFi / Bluetooth",
   "foco.puerto": "Puerto COM:",
   "foco.conectar": "Conectar",
   "foco.desconectar": "Desconectar",
@@ -80,9 +80,9 @@
   "ventana.versiones": "App {0}  ·  Firmware {1}",
   "ventana.appNueva": "Hay una versión nueva de la app: {0}. Pulsa aquí para descargar el instalador.",
   "foco.buscar": "Buscar",
-  "foco.buscando": "Buscando el equipo en los puertos USB...",
+  "foco.buscando": "Buscando el equipo por USB y Bluetooth...",
   "foco.encontrados": "Encontrados {0} equipo(s). Elige uno y pulsa Conectar.",
-  "foco.ningunEquipo": "No se ha encontrado ningun equipo. Comprueba el cable, o elige el puerto a mano.",
+  "foco.ningunEquipo": "No se ha encontrado ningun equipo. Comprueba el cable o el Bluetooth, o elige el puerto a mano.",
   "tab.firmware": "Actualizar firmware",
   "fw.sinConexion": "Conecta el equipo en la primera pestaña para ver qué firmware lleva.",
   "fw.sinSoporte": "El firmware del equipo ({0}) no admite actualizarse por USB.\nGrábalo una vez con flash.ps1; las siguientes ya se pueden hacer desde aquí.",
@@ -122,5 +122,10 @@
   "fw.confirmarMotor": "Este firmware es para el motor {0}, pero el equipo lleva el del motor {1}.\n\nGrábalo solo si has cambiado el motor. ¿Continuar?",
   "fw.confirmarVersion": "La versión elegida ({0}) no es más nueva que la del equipo ({1}).\n\n¿Grabarla igualmente?",
   "fw.confirmar": "Se va a grabar {0} en el equipo.\n\nNo desconectes el USB hasta que termine; el equipo se reiniciará solo.\n\n¿Continuar?",
-  "fw.noCerrar": "Se está grabando el firmware. Espera a que termine antes de cerrar la ventana."
+  "fw.noCerrar": "Se está grabando el firmware. Espera a que termine antes de cerrar la ventana.",
+  "wifi.bleActivado": "Bluetooth activado",
+  "ble.emparejando": "Emparejando por Bluetooth: teclea el PIN que aparece en la pantalla del equipo.",
+  "ble.pinTexto": "Teclea el PIN de 4 cifras que aparece ahora\nen la pantalla del equipo:",
+  "ble.errEmparejar": "No se pudo emparejar: {0}",
+  "ble.confirmarApagar": "Estás conectado por Bluetooth. Si lo desactivas, después de reiniciar\nsolo podrás conectar por USB o por WiFi.\n\n¿Continuar?"
 }

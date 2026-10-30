@@ -9,14 +9,20 @@ namespace ASCOM.AstroK
     /// <summary>Un AstroK encontrado en un puerto, con lo que contestó al sondeo.</summary>
     public sealed class EquipoEncontrado
     {
-        public string Puerto;    // "COM7"
+        public string Puerto;    // "COM7", o "BLE:7CE8B1D38A1A"
         public string Modo;      // "FOCUSER" o "ROTATOR", tal cual lo da :DM#
         public string Firmware;  // "1.2", o vacío si el firmware es anterior a :DV#
+        public bool Bluetooth;
+        public string Nombre;    // el anunciado por BLE, "AstroK_D38A18"
 
         /// <summary>Lo que se ve en el desplegable.</summary>
         public override string ToString()
         {
             string etiqueta = Modo == "ROTATOR" ? "AstroK Rotator" : "AstroK Focuser";
+            // Por BLE la versión no se sabe hasta conectar: el anuncio solo
+            // lleva el modo.
+            if (Bluetooth)
+                return (string.IsNullOrEmpty(Nombre) ? Puerto : Nombre) + " (Bluetooth)  -  " + etiqueta;
             return string.IsNullOrEmpty(Firmware)
                 ? Puerto + "  -  " + etiqueta
                 : Puerto + "  -  " + etiqueta + " " + Firmware;
@@ -38,6 +44,9 @@ namespace ASCOM.AstroK
         // margen: abrir el puerto resetea el ESP32 (USB nativo).
         private const int EsperaTrasAbrirMs = 400;
         private const int TimeoutSondeoMs = 1000;
+        // Los equipos se anuncian cada ~100 ms, pero el nombre llega aparte,
+        // en la respuesta al escaneo, y Windows no la pide en cada anuncio.
+        private const int EscuchaBleMs = 4000;
 
         /// <summary>
         /// Puertos serie presentes que cuelgan de USB, en orden natural (COM2
@@ -98,12 +107,23 @@ namespace ASCOM.AstroK
             string modoBuscado = rotador ? "ROTATOR" : "FOCUSER";
             var encontrados = new List<EquipoEncontrado>();
 
+            // BLE en paralelo: es una escucha de duración fija, y el sondeo
+            // USB tarda lo suyo por puerto. Sin Windows 10 o sin adaptador,
+            // simplemente no aparece nada por ahí.
+            var ble = System.Threading.Tasks.Task.Factory.StartNew(() =>
+            {
+                try { return BleCanal.Buscar(rotador, EscuchaBleMs); }
+                catch { return new List<EquipoEncontrado>(); }
+            });
+
             foreach (string puerto in PuertosUsb())
             {
                 EquipoEncontrado equipo = Sondear(puerto);
                 if (equipo != null && equipo.Modo == modoBuscado) encontrados.Add(equipo);
             }
 
+            // USB primero: si el equipo está enchufado, es la conexión buena.
+            encontrados.AddRange(ble.Result.OrderBy(e => e.Nombre ?? e.Puerto));
             return encontrados;
         }
 

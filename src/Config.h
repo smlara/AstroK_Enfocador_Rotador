@@ -314,6 +314,11 @@ extern long max_steps_global;
 #define DEFAULT_WIFI_AP_NAME ""
 #define DEFAULT_WIFI_AP_PASSWORD "12345678"
 
+// BLE defaults
+// false: no se anuncia ni acepta conexiones por Bluetooth (sección "ble" de
+// la config; si falta, encendido).
+#define DEFAULT_BLE_ENABLED true
+
 // =================================================================
 // Códigos de Error (Mostrados en OLED)
 // =================================================================

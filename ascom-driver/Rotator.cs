@@ -277,7 +277,7 @@ namespace ASCOM.AstroK
 
         // ASCOM define DriverVersion como "m.n": solo major y minor. Por eso
         // aqui va 2.0 y no el 2.0.1 del ensamblado y los instaladores.
-        public string DriverVersion { get { return "2.0"; } }
+        public string DriverVersion { get { return "2.1"; } }
 
         public short InterfaceVersion { get { return 3; } }
 

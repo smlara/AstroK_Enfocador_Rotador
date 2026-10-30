@@ -8,6 +8,7 @@
 #include "TMC2226Manager.h"
 #include <Update.h>
 #include <LittleFS.h>
+#include "BleLink.h"
 
 extern Preferences preferences;
 extern TMC2226Manager tmcDriver;
@@ -59,8 +60,9 @@ static bool b64Decode(const String& codificado, String& salida) {
 
 FocuserProtocol::FocuserProtocol(AccelStepper& stepper, long& targetPos, bool& isRotatorRef, bool& rotatorReverseRef)
     : _stepper(stepper), _targetPos(targetPos), _isRotator(isRotatorRef), _rotatorReverse(rotatorReverseRef),
-      _onConfigApplied(nullptr) {
+      _onConfigApplied(nullptr), _out(&Serial) {
     _buffer.reserve(16); // Evita fragmentación de memoria
+    _bufferBle.reserve(16);
 }
 
 void FocuserProtocol::setConfigAppliedCallback(void (*cb)()) {
@@ -68,17 +70,26 @@ void FocuserProtocol::setConfigAppliedCallback(void (*cb)()) {
 }
 
 void FocuserProtocol::procesarSerial() {
-    while (Serial.available()) {
-        if (Serial.available() > 0) {
-            char c = (char)Serial.read();
-            if (c == ':') {
-                _buffer = "";
-            } else if (c == '#') {
-                ejecutarComando(_buffer);
-                _buffer = "";
-            } else {
-                _buffer += c;
-            }
+    procesarCanal(Serial, _buffer);
+}
+
+void FocuserProtocol::procesarBle() {
+    procesarCanal(bleLink, _bufferBle);
+}
+
+// Cada canal tiene su buffer: un comando a medias por USB no se mezcla con
+// uno que llegue por BLE. La respuesta sale por el canal que trajo el comando.
+void FocuserProtocol::procesarCanal(Stream& canal, String& buffer) {
+    while (canal.available() > 0) {
+        char c = (char)canal.read();
+        if (c == ':') {
+            buffer = "";
+        } else if (c == '#') {
+            _out = &canal;
+            ejecutarComando(buffer);
+            buffer = "";
+        } else {
+            buffer += c;
         }
     }
 }
@@ -107,7 +118,7 @@ void FocuserProtocol::ejecutarComando(String cmd) {
             // "1.4": hay clientes que parsean exactamente dos caracteres. Para
             // la version completa y legible esta :DV#, que usa la app propia.
             // Mantener sincronizado con custom_version de platformio.ini.
-            if (codigo == "GV") { Serial.print("14#"); } // version 1.4
+            if (codigo == "GV") { _out->print("15#"); } // version 1.5
             else if (codigo == "GP") {
                 long pos = _stepper.currentPosition();
                 if (_isRotator) {
@@ -127,9 +138,9 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                     enviarRespuestaHex(pos);
                 }
             }
-            else if (codigo == "GI") { Serial.print(_stepper.distanceToGo() != 0 ? "01#" : "00#"); }
-            else if (codigo == "GD") { Serial.print("02#"); } // Motor Delay (Fijo para engañar a ASCOM)
-            else if (codigo == "GH") { Serial.print("00#"); } // Half step: No
+            else if (codigo == "GI") { _out->print(_stepper.distanceToGo() != 0 ? "01#" : "00#"); }
+            else if (codigo == "GD") { _out->print("02#"); } // Motor Delay (Fijo para engañar a ASCOM)
+            else if (codigo == "GH") { _out->print("00#"); } // Half step: No
             // El dispositivo no lleva sensor de temperatura. Se responde a GT y GC
             // para no dejar colgado al cliente, que espera 4 dígitos hex siempre.
             else if (codigo == "GT") { enviarRespuestaHex(0); }
@@ -200,8 +211,8 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                   // :CG# leer, :CS<b64># guardar, :CR# valores de fábrica.
             if (codigo == "CG") {
                 String cfg = preferences.getString("config", "{}");
-                Serial.print(b64Encode(cfg));
-                Serial.print("#");
+                _out->print(b64Encode(cfg));
+                _out->print("#");
             }
             else if (codigo == "CS") {
                 String json;
@@ -218,7 +229,7 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                         if (_onConfigApplied) _onConfigApplied();
                     }
                 }
-                Serial.print(ok ? "OK#" : "ER#");
+                _out->print(ok ? "OK#" : "ER#");
             }
             else if (codigo == "CR") {
                 // Valores de fábrica: se borra la clave entera y el siguiente
@@ -227,8 +238,11 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 // suele ser justo aquel en el que no hay forma de llegar por
                 // red al equipo.
                 preferences.remove("config");
-                Serial.print("OK#");
-                Serial.flush();
+                // Los vínculos BLE también: tras un reset de fábrica nadie
+                // debería seguir pudiendo conectar sin volver a emparejarse.
+                bleLink.olvidarEmparejamientos();
+                _out->print("OK#");
+                _out->flush();
                 delay(200);
                 ESP.restart();
             }
@@ -236,21 +250,21 @@ void FocuserProtocol::ejecutarComando(String cmd) {
 
         case 'D': // DIAGNÓSTICO del driver / modo del equipo
             if (codigo == "DS") {
-                Serial.print(tmcDriver.getDiagnostics());
-                Serial.print("#");
+                _out->print(tmcDriver.getDiagnostics());
+                _out->print("#");
             }
             else if (codigo == "DV") {
                 // Version completa del firmware, sin el corse de dos digitos
                 // de :GV#. La app la muestra tal cual.
-                Serial.print(FW_VERSION);
-                Serial.print("#");
+                _out->print(FW_VERSION);
+                _out->print("#");
             }
             else if (codigo == "DM") {
                 // El modo lo fija el jumper al arrancar, y enfocador y rotador
                 // son productos distintos con su propio driver ASCOM. Sin esto,
                 // conectar el driver equivocado funcionaría mal en silencio en
                 // vez de avisar.
-                Serial.print(_isRotator ? "ROTATOR#" : "FOCUSER#");
+                _out->print(_isRotator ? "ROTATOR#" : "FOCUSER#");
             }
             else if (codigo == "DH") {
                 // Para que se compilo este firmware: motor y chip, como
@@ -258,10 +272,10 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 // actualizacion, que se llama astrok_<motor>_v..., y para no
                 // grabar la imagen de otro chip (el numero es el chip_id de la
                 // cabecera de las imagenes ESP32: 5 = C3, 9 = S3).
-                Serial.print(FW_MOTOR);
-                Serial.print(";");
-                Serial.print(CONFIG_IDF_FIRMWARE_CHIP_ID);
-                Serial.print("#");
+                _out->print(FW_MOTOR);
+                _out->print(";");
+                _out->print(CONFIG_IDF_FIRMWARE_CHIP_ID);
+                _out->print("#");
             }
             break;
 
@@ -275,20 +289,20 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 // driver sin depender de tener acceso por red.
                 wifi_mode_t modo = WiFi.getMode();
                 if (modo == WIFI_STA && WiFi.status() == WL_CONNECTED) {
-                    Serial.print("STA:");
-                    Serial.print(WiFi.localIP().toString());
+                    _out->print("STA:");
+                    _out->print(WiFi.localIP().toString());
                 } else if (modo == WIFI_AP || modo == WIFI_AP_STA) {
-                    Serial.print("AP:");
-                    Serial.print(WiFi.softAPIP().toString());
+                    _out->print("AP:");
+                    _out->print(WiFi.softAPIP().toString());
                 } else {
-                    Serial.print("OFF:0.0.0.0");
+                    _out->print("OFF:0.0.0.0");
                 }
-                Serial.print("#");
+                _out->print("#");
             }
             else if (codigo == "WR") {
                 // Los cambios de WiFi solo se aplican al arrancar.
-                Serial.print("OK#");
-                Serial.flush();
+                _out->print("OK#");
+                _out->flush();
                 delay(200);
                 ESP.restart();
             }
@@ -304,8 +318,8 @@ void FocuserProtocol::enviarRespuestaHex(long valor) {
     // int.Parse(..., HexNumber) en el driver.
     char hex[12];
     snprintf(hex, sizeof(hex), "%04lX", (unsigned long)valor);
-    Serial.print(hex);
-    Serial.print("#");
+    _out->print(hex);
+    _out->print("#");
 }
 // --- Actualizacion de firmware por USB ---------------------------------
 // La imagen va a la particion OTA que no esta en uso, asi que el firmware que
@@ -372,10 +386,10 @@ int FocuserProtocol::progresoActualizacion() {
 // Medido: de vez en cuando un "OK#" no salia hasta la respuesta siguiente, y
 // como el driver espera ese OK para mandar el trozo siguiente, la
 // transferencia se quedaba parada a medias.
-static void otaResponder(const char* error) {
-    if (error) { Serial.print("ER:"); Serial.print(error); Serial.print("#"); }
-    else Serial.print("OK#");
-    Serial.flush();
+static void otaResponder(Print& out, const char* error) {
+    if (error) { out.print("ER:"); out.print(error); out.print("#"); }
+    else out.print("OK#");
+    out.flush();
 }
 
 void FocuserProtocol::atenderActualizacion(const String& codigo, const String& params) {
@@ -386,32 +400,32 @@ void FocuserProtocol::atenderActualizacion(const String& codigo, const String& p
 
         // Escribir en flash con el motor en marcha da pasos a tirones, y el
         // reinicio del final lo pararia de golpe.
-        if (_stepper.distanceToGo() != 0) { otaResponder("MOVING"); return; }
+        if (_stepper.distanceToGo() != 0) { otaResponder(*_out, "MOVING"); return; }
 
         int coma = params.indexOf(',');
         long tamano = (coma > 0) ? params.substring(0, coma).toInt() : 0;
         String md5 = (coma > 0) ? params.substring(coma + 1) : "";
         bool web = md5.endsWith(",W");
         if (web) md5 = md5.substring(0, md5.length() - 2);
-        if (tamano <= 0 || md5.length() != 32) { otaResponder("PARAMS"); return; }
+        if (tamano <= 0 || md5.length() != 32) { otaResponder(*_out, "PARAMS"); return; }
 
         // Con la web montada, el servidor podria leer ficheros a medio
         // escribir; tras :UE# se reinicia y se vuelve a montar.
         if (web) LittleFS.end();
         otaWeb = web;
-        if (!Update.begin((size_t)tamano, web ? U_SPIFFS : U_FLASH)) { otaResponder(Update.errorString()); return; }
-        if (!Update.setMD5(md5.c_str())) { Update.abort(); otaResponder("MD5"); return; }
+        if (!Update.begin((size_t)tamano, web ? U_SPIFFS : U_FLASH)) { otaResponder(*_out, Update.errorString()); return; }
+        if (!Update.setMD5(md5.c_str())) { Update.abort(); otaResponder(*_out, "MD5"); return; }
         otaTamano = (size_t)tamano;
         otaUltimoMs = millis();
-        otaResponder(nullptr);
+        otaResponder(*_out, nullptr);
     }
     else if (codigo == "UD") {
-        if (!Update.isRunning()) { otaResponder("NOT_STARTED"); return; }
+        if (!Update.isRunning()) { otaResponder(*_out, "NOT_STARTED"); return; }
 
         int coma = params.indexOf(',');
-        if (coma <= 0) { otaResponder("PARAMS"); return; }
+        if (coma <= 0) { otaResponder(*_out, "PARAMS"); return; }
         size_t offset = (size_t)strtoul(params.substring(0, coma).c_str(), NULL, 16);
-        if (offset != otaRecibido) { otaResponder("OFFSET"); return; }
+        if (offset != otaRecibido) { otaResponder(*_out, "OFFSET"); return; }
 
         // 1024 bytes por trozo como mucho (1368 caracteres de base64); se
         // deja margen por si el driver cambia de tamano.
@@ -420,7 +434,7 @@ void FocuserProtocol::atenderActualizacion(const String& codigo, const String& p
         const char* b64 = params.c_str() + coma + 1;
         if (mbedtls_base64_decode(datos, sizeof(datos), &n,
                                   (const unsigned char*)b64, strlen(b64)) != 0 || n == 0) {
-            otaResponder("BASE64");
+            otaResponder(*_out, "BASE64");
             return;
         }
 
@@ -432,66 +446,66 @@ void FocuserProtocol::atenderActualizacion(const String& codigo, const String& p
             uint16_t chip = (n >= 14) ? (uint16_t)(datos[12] | (datos[13] << 8)) : 0xFFFF;
             if (datos[0] != 0xE9 || chip != CONFIG_IDF_FIRMWARE_CHIP_ID) {
                 Update.abort();
-                otaResponder("CHIP");
+                otaResponder(*_out, "CHIP");
                 return;
             }
         }
 
         if (otaRecibido + n > otaTamano || Update.write(datos, n) != n) {
             Update.abort();
-            otaResponder("WRITE");
+            otaResponder(*_out, "WRITE");
             return;
         }
         otaRecibido += n;
         otaUltimoMs = millis();
-        otaResponder(nullptr);
+        otaResponder(*_out, nullptr);
     }
     else if (codigo == "UF") {
-        if (!Update.isRunning()) { otaResponder("NOT_STARTED"); return; }
+        if (!Update.isRunning()) { otaResponder(*_out, "NOT_STARTED"); return; }
 
         int coma = params.indexOf(',');
-        if (coma <= 0) { otaResponder("PARAMS"); return; }
+        if (coma <= 0) { otaResponder(*_out, "PARAMS"); return; }
         size_t offset = (size_t)strtoul(params.substring(0, coma).c_str(), NULL, 16);
         size_t n = (size_t)strtoul(params.substring(coma + 1).c_str(), NULL, 16);
-        if (offset != otaRecibido) { otaResponder("OFFSET"); return; }
+        if (offset != otaRecibido) { otaResponder(*_out, "OFFSET"); return; }
         // A 0 se podria quedar el driver repitiendolo sin avanzar.
-        if (n == 0 || n > 0x10000) { otaResponder("PARAMS"); return; }
+        if (n == 0 || n > 0x10000) { otaResponder(*_out, "PARAMS"); return; }
         // Con offset 0 seria el principio de la imagen del programa, y la
         // comprobacion del chip de :UD# se saltaria.
-        if (offset == 0 && !otaWeb) { otaResponder("CHIP"); return; }
-        if (otaRecibido + n > otaTamano) { Update.abort(); otaResponder("WRITE"); return; }
+        if (offset == 0 && !otaWeb) { otaResponder(*_out, "CHIP"); return; }
+        if (otaRecibido + n > otaTamano) { Update.abort(); otaResponder(*_out, "WRITE"); return; }
 
         static uint8_t vacio[1024];
         static bool vacioListo = false;
         if (!vacioListo) { memset(vacio, 0xFF, sizeof(vacio)); vacioListo = true; }
         for (size_t hecho = 0; hecho < n; ) {
             size_t t = (n - hecho < sizeof(vacio)) ? n - hecho : sizeof(vacio);
-            if (Update.write(vacio, t) != t) { Update.abort(); otaResponder("WRITE"); return; }
+            if (Update.write(vacio, t) != t) { Update.abort(); otaResponder(*_out, "WRITE"); return; }
             hecho += t;
         }
         otaRecibido += n;
         otaUltimoMs = millis();
-        otaResponder(nullptr);
+        otaResponder(*_out, nullptr);
     }
     else if (codigo == "UE") {
-        if (!Update.isRunning()) { otaResponder("NOT_STARTED"); return; }
-        if (otaRecibido != otaTamano) { Update.abort(); otaResponder("SIZE"); return; }
-        if (!Update.end()) { otaResponder(Update.errorString()); return; }
-        otaResponder(nullptr);
-        Serial.flush();
+        if (!Update.isRunning()) { otaResponder(*_out, "NOT_STARTED"); return; }
+        if (otaRecibido != otaTamano) { Update.abort(); otaResponder(*_out, "SIZE"); return; }
+        if (!Update.end()) { otaResponder(*_out, Update.errorString()); return; }
+        otaResponder(*_out, nullptr);
+        _out->flush();
         delay(300);
         ESP.restart();
     }
     else if (codigo == "US") {
-        if (!Update.isRunning()) { otaResponder("NOT_STARTED"); return; }
-        Serial.print(String((unsigned long)otaRecibido, HEX));
-        Serial.print("#");
-        Serial.flush();
+        if (!Update.isRunning()) { otaResponder(*_out, "NOT_STARTED"); return; }
+        _out->print(String((unsigned long)otaRecibido, HEX));
+        _out->print("#");
+        _out->flush();
     }
     else if (codigo == "UA") {
         if (Update.isRunning()) Update.abort();
         otaTamano = 0;
         otaRecibido = 0;
-        otaResponder(nullptr);
+        otaResponder(*_out, nullptr);
     }
 }

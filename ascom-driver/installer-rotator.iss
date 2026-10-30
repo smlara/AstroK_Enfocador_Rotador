@@ -4,7 +4,7 @@
 ; La salida va a ..\bin\ (el de la raiz, junto a los firmwares y fw.php)
 
 #define AppName        "AstroK Rotator (driver ASCOM)"
-#define AppVersion     "2.0.1"
+#define AppVersion     "2.1.0"
 #define AppPublisher   "AstroK"
 #define DriverDll      "ASCOM.AstroK.Rotator.dll"
 #define DriverId       "ASCOM.AstroK.Rotator"

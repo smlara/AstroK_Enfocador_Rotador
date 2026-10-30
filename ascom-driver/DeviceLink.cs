@@ -9,6 +9,10 @@ namespace ASCOM.AstroK
     /// Capa de transporte con el dispositivo: protocolo serie del firmware,
     /// incluidas las extensiones (:CG#, :CS#, :CR#, :WI#, :WR#).
     ///
+    /// El mismo protocolo va por USB o por Bluetooth LE. El "puerto" decide:
+    /// "COM7" abre el serie y "BLE:7CE8B1D38A1A" el BLE (ver BleCanal). Así
+    /// el perfil ASCOM y la ventana guardan uno u otro en el mismo campo.
+    ///
     /// La usan tanto el driver como la ventana de configuración, que necesita
     /// hablar con el equipo estando el driver desconectado.
     ///
@@ -18,8 +22,41 @@ namespace ASCOM.AstroK
     /// </summary>
     public class DeviceLink : IDisposable
     {
-        private SerialPort _port;
+        /// <summary>Lo que se usa de SerialPort, para poder poner BLE debajo.</summary>
+        internal interface ICanal
+        {
+            bool IsOpen { get; }
+            int ReadTimeout { get; set; }
+            void Write(string texto);
+            string ReadTo(string fin);
+            void DiscardInBuffer();
+            void Close();
+        }
+
+        private sealed class CanalSerie : ICanal
+        {
+            private readonly SerialPort _serie;
+            public CanalSerie(SerialPort serie) { _serie = serie; }
+            public bool IsOpen { get { return _serie.IsOpen; } }
+            public int ReadTimeout { get { return _serie.ReadTimeout; } set { _serie.ReadTimeout = value; } }
+            public void Write(string texto) { _serie.Write(texto); }
+            public string ReadTo(string fin) { return _serie.ReadTo(fin); }
+            public void DiscardInBuffer() { _serie.DiscardInBuffer(); }
+            public void Close()
+            {
+                try { if (_serie.IsOpen) _serie.Close(); } catch { }
+                _serie.Dispose();
+            }
+        }
+
+        private ICanal _port;
         private readonly object _lock = new object();
+
+        /// <summary>El canal abierto es Bluetooth (y no USB).</summary>
+        public bool EsBluetooth
+        {
+            get { lock (_lock) { return _port is BleCanal; } }
+        }
 
         public bool IsOpen
         {
@@ -31,6 +68,13 @@ namespace ASCOM.AstroK
             lock (_lock)
             {
                 Close();
+
+                // Por BLE no hay reset al conectar ni banner que descartar.
+                if (BleCanal.EsBle(comPort))
+                {
+                    _port = new BleCanal(comPort);
+                    return;
+                }
 
                 var port = new SerialPort(comPort, 115200, Parity.None, 8, StopBits.One)
                 {
@@ -53,7 +97,7 @@ namespace ASCOM.AstroK
                 System.Threading.Thread.Sleep(300);
                 port.DiscardInBuffer();
 
-                _port = port;
+                _port = new CanalSerie(port);
             }
         }
 
@@ -62,8 +106,7 @@ namespace ASCOM.AstroK
             lock (_lock)
             {
                 if (_port == null) return;
-                try { if (_port.IsOpen) _port.Close(); } catch { }
-                _port.Dispose();
+                _port.Close();
                 _port = null;
             }
         }

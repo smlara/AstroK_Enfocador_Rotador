@@ -8,6 +8,8 @@
 #include "FocuserProtocol.h"
 #include "TMC2226Manager.h"
 #include "AlpacaServer.h"
+#include "BleLink.h"
+#include <esp_mac.h>
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
@@ -48,6 +50,7 @@ void IRAM_ATTR stallInterrupt() {
 // (ver setTickCallback en AlpacaServer).
 void atenderSerial() {
     protocolo.procesarSerial();
+    protocolo.procesarBle();
 }
 
 // Lee de una sección de config la velocidad y la aceleración, las acota al
@@ -190,6 +193,8 @@ void setup() {
         wifi["ap_password"] = DEFAULT_WIFI_AP_PASSWORD;
        // wifi["networks"].to<JsonArray>();
 
+        configDoc["ble"]["enabled"] = DEFAULT_BLE_ENABLED;
+
         JsonObject focuser = configDoc["focuser"].to<JsonObject>();
         focuser["hold_current_ma"] = DEFAULT_FOCUSER_HOLD_CURRENT_MA;
         focuser["current_ma"] = DEFAULT_FOCUSER_CURRENT_MA;
@@ -286,6 +291,20 @@ void setup() {
     // resetea el ESP32, así que un cliente serie (el driver ASCOM) que
     // conecte y pregunte de inmediato se comería ese silencio y daría
     // timeout: se atiende el protocolo durante esas esperas.
+    // BLE va antes que la WiFi por lo mismo: se puede conectar y preguntar
+    // mientras la WiFi arranca. El nombre lleva el mismo sufijo que el AP
+    // por defecto (los 6 últimos hex de la MAC de estación), para que los dos
+    // se reconozcan como el mismo equipo.
+    // Sin la sección "ble" (configuración de un firmware anterior a 1.5),
+    // encendido.
+    if (configDoc["ble"]["enabled"] | DEFAULT_BLE_ENABLED) {
+        uint8_t mac[6];
+        esp_read_mac(mac, ESP_MAC_WIFI_STA);
+        char nombreBle[16];
+        snprintf(nombreBle, sizeof(nombreBle), "AstroK_%02X%02X%02X", mac[3], mac[4], mac[5]);
+        bleLink.begin(nombreBle, isRotator);
+    }
+
     alpacaServer.setTickCallback(atenderSerial);
     protocolo.setConfigAppliedCallback(aplicarConfigMotor);
     alpacaServer.setConfigAppliedCallback(aplicarConfigMotor);
@@ -311,10 +330,12 @@ void setup() {
     unsigned long startWait = millis();
     while (millis() - startWait < 10000) {
         alpacaServer.loop(); // Procesar clientes web mientras espera
-        protocolo.procesarSerial(); // ...y también el protocolo serie
+        atenderSerial(); // ...y también el protocolo serie y BLE
 
-        // Salta la espera si se gira el encoder o se pulsa el botón
-        if (manualControl.getUpdatedPosition(0, false) != 0 || digitalRead(PIN_ENC_SW) == LOW) {
+        // Salta la espera si se gira el encoder o se pulsa el botón, o si
+        // hay que enseñar el PIN de un emparejamiento BLE (lo pinta loop()).
+        if (manualControl.getUpdatedPosition(0, false) != 0 || digitalRead(PIN_ENC_SW) == LOW ||
+            bleLink.pinPendiente() >= 0) {
             break;
         }
         delay(5);
@@ -333,6 +354,7 @@ void loop() {
 
     // 1. Comunicación PC
     protocolo.procesarSerial();
+    protocolo.procesarBle();
 
     // 2. Control Manual (Solo si está activado en el .ini)
     targetPos = manualControl.getUpdatedPosition(targetPos, stepper.distanceToGo() != 0);
@@ -483,6 +505,22 @@ void loop() {
             ultimaActualizacionOled = millis();
         }
         return;
+    }
+
+    // PIN de emparejamiento BLE: se queda en pantalla mientras dure el
+    // emparejamiento, y se quita en cuanto acaba (bien o mal).
+    static long pinEnPantalla = -1;
+    long pinBle = bleLink.pinPendiente();
+    if (pinBle != pinEnPantalla) {
+        pinEnPantalla = pinBle;
+        if (pinBle >= 0) {
+            char texto[12];
+            snprintf(texto, sizeof(texto), "PIN %04ld", pinBle);
+            oled.mostrarMensaje(texto, 2);
+            tiempoMensajeHasta = millis() + 60000;
+        } else {
+            tiempoMensajeHasta = 0;
+        }
     }
 
     if (millis() < tiempoMensajeHasta) {
