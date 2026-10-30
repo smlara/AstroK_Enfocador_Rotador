@@ -1021,7 +1021,7 @@ void AlpacaServer::handleSetConfig() {
 
 void AlpacaServer::handleFactoryReset() {
     preferences.remove("config");
-    bleLink.olvidarEmparejamientos(); // como :CR#
+    bleLink.borrarPin(); // como :CR#
     server->send(200, "application/json", "{\"status\":\"ok\", \"message\":\"Config erased. Rebooting...\"}");
     delay(500);
     ESP.restart();

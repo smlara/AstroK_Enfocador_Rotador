@@ -1,5 +1,6 @@
 #include "BleLink.h"
 #include <NimBLEDevice.h>
+#include <Preferences.h>
 
 BleLink bleLink;
 
@@ -11,6 +12,14 @@ BleLink bleLink;
 // manda el siguiente hasta tener el OK: con esto cabe uno entero con margen.
 #define RX_TAM 4096
 
+// Fallos de PIN seguidos que se toleran en una conexión antes de cortarla.
+#define PIN_FALLOS_MAX 3
+
+// El PIN va en su propio espacio de NVS, aparte de la configuración: guardar
+// la configuración (web o :CS#) no lo toca.
+#define NVS_ESPACIO "ble"
+#define NVS_CLAVE_PIN "pin"
+
 static uint8_t rxBuf[RX_TAM];
 static volatile size_t rxCabeza = 0; // donde escribe la tarea de NimBLE
 static volatile size_t rxCola = 0;   // donde lee loop()
@@ -18,9 +27,14 @@ static portMUX_TYPE rxMux = portMUX_INITIALIZER_UNLOCKED;
 
 static NimBLECharacteristic* txChar = nullptr;
 static volatile uint16_t conexion = BLE_HS_CONN_HANDLE_NONE;
-static volatile long pin = -1;
 static bool iniciado = false;
 static String txPendiente;
+
+static String pinGuardado;
+// Por conexión: se ponen a cero al conectar y al desconectar.
+static volatile bool sesionAutenticada = false;
+static uint8_t fallosPin = 0;
+static bool cortarTrasEnviar = false;
 
 static void vaciarRx() {
     portENTER_CRITICAL(&rxMux);
@@ -31,25 +45,15 @@ static void vaciarRx() {
 class ServidorCallbacks : public NimBLEServerCallbacks {
     void onConnect(NimBLEServer*, ble_gap_conn_desc* desc) override {
         vaciarRx();
+        sesionAutenticada = false;
+        fallosPin = 0;
+        cortarTrasEnviar = false;
         conexion = desc->conn_handle;
     }
     // NimBLE vuelve a anunciar solo al desconectarse (advertiseOnDisconnect).
     void onDisconnect(NimBLEServer*) override {
         conexion = BLE_HS_CONN_HANDLE_NONE;
-        pin = -1;
-    }
-    // La pila pide la clave que va a enseñar (somos DISPLAY_ONLY). Una nueva
-    // en cada intento: una fija se acaba sabiendo, y no hay teclado para
-    // cambiarla. loop() la pinta, no esta tarea: la OLED no es reentrante.
-    uint32_t onPassKeyRequest() override {
-        uint32_t clave = esp_random() % 1000000;
-        pin = (long)clave;
-        return clave;
-    }
-    void onAuthenticationComplete(ble_gap_conn_desc* desc) override {
-        pin = -1;
-        if (!desc->sec_state.encrypted || !desc->sec_state.authenticated)
-            NimBLEDevice::getServer()->disconnect(desc->conn_handle);
+        sesionAutenticada = false;
     }
 };
 
@@ -70,12 +74,18 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 void BleLink::begin(const String& nombre, bool rotador) {
+    // En escritura aunque solo se lea: en solo lectura, si el espacio aún no
+    // existe, Preferences saca un error por Serial que se mezcla con el
+    // protocolo. Y getString() de una clave ausente también lo saca.
+    Preferences prefs;
+    if (prefs.begin(NVS_ESPACIO, false)) {
+        if (prefs.isKey(NVS_CLAVE_PIN)) pinGuardado = prefs.getString(NVS_CLAVE_PIN, "");
+        prefs.end();
+    }
+    if (!pinValido(pinGuardado)) pinGuardado = "";
+
     NimBLEDevice::init(nombre.c_str());
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-    // Vínculo guardado, protección MITM (por eso la clave) y LE Secure
-    // Connections. Sin teclado: el equipo solo enseña el PIN.
-    NimBLEDevice::setSecurityAuth(true, true, true);
-    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_DISPLAY_ONLY);
     // Lo que se pide; el cliente decide. Con el de por defecto (23) cada
     // notificación lleva 20 bytes y :CG# necesitaría decenas.
     NimBLEDevice::setMTU(247);
@@ -85,8 +95,7 @@ void BleLink::begin(const String& nombre, bool rotador) {
     NimBLEService* svc = servidor->createService(NUS_SERVICE);
     txChar = svc->createCharacteristic(NUS_TX, NIMBLE_PROPERTY::NOTIFY);
     NimBLECharacteristic* rx = svc->createCharacteristic(
-        NUS_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR |
-                NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN);
+        NUS_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
     rx->setCallbacks(new RxCallbacks());
     svc->start();
 
@@ -106,16 +115,66 @@ bool BleLink::activo() const {
     return iniciado;
 }
 
-long BleLink::pinPendiente() const {
-    return pin;
-}
-
-void BleLink::olvidarEmparejamientos() {
-    if (iniciado) NimBLEDevice::deleteAllBonds();
-}
-
 bool BleLink::conectado() const {
     return conexion != BLE_HS_CONN_HANDLE_NONE;
+}
+
+bool BleLink::pinValido(const String& p) {
+    if (p.length() != 4) return false;
+    for (size_t i = 0; i < 4; i++)
+        if (!isDigit(p[i])) return false;
+    return true;
+}
+
+bool BleLink::pinDefinido() const {
+    return pinGuardado.length() > 0;
+}
+
+String BleLink::pin() const {
+    return pinGuardado;
+}
+
+bool BleLink::fijarPin(const String& p) {
+    if (!pinValido(p)) return false;
+    Preferences prefs;
+    if (!prefs.begin(NVS_ESPACIO, false)) return false;
+    prefs.putString(NVS_CLAVE_PIN, p);
+    prefs.end();
+    pinGuardado = p;
+    return true;
+}
+
+void BleLink::borrarPin() {
+    Preferences prefs;
+    if (prefs.begin(NVS_ESPACIO, false)) {
+        if (prefs.isKey(NVS_CLAVE_PIN)) prefs.remove(NVS_CLAVE_PIN);
+        prefs.end();
+    }
+    pinGuardado = "";
+    // Quien estuviera conectado sigue dentro: borrar el PIN no echa a nadie,
+    // solo cambia lo que se pedirá en la próxima conexión.
+}
+
+bool BleLink::autenticado() const {
+    return sesionAutenticada;
+}
+
+bool BleLink::autenticar(const String& p) {
+    if (!pinValido(p)) return false;
+    // Primera conexión de un equipo sin PIN: el que trae se queda.
+    if (!pinDefinido()) {
+        if (!fijarPin(p)) return false;
+        sesionAutenticada = true;
+        return true;
+    }
+    if (p == pinGuardado) {
+        sesionAutenticada = true;
+        fallosPin = 0;
+        return true;
+    }
+    // Se corta después de mandar la respuesta, que se escribe al volver de aquí.
+    if (++fallosPin >= PIN_FALLOS_MAX) cortarTrasEnviar = true;
+    return false;
 }
 
 int BleLink::available() {
@@ -161,11 +220,7 @@ size_t BleLink::write(const uint8_t* buf, size_t n) {
 // sin avisar. Por eso se llama directamente a la pila y se reintenta.
 void BleLink::flush() {
     uint16_t con = conexion;
-    // Sin cifrar no llega ningún comando (RX lo exige), pero se comprueba
-    // también aquí para no mandar nada a quien no se ha emparejado.
-    ble_gap_conn_desc desc;
-    if (con == BLE_HS_CONN_HANDLE_NONE || txChar == nullptr ||
-        ble_gap_conn_find(con, &desc) != 0 || !desc.sec_state.encrypted) {
+    if (con == BLE_HS_CONN_HANDLE_NONE || txChar == nullptr || txPendiente.length() == 0) {
         txPendiente = "";
         return;
     }
@@ -190,4 +245,9 @@ void BleLink::flush() {
         hecho += n;
     }
     txPendiente = "";
+
+    if (cortarTrasEnviar) {
+        cortarTrasEnviar = false;
+        NimBLEDevice::getServer()->disconnect(con);
+    }
 }

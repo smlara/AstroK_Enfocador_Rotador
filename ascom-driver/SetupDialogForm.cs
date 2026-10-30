@@ -719,6 +719,10 @@ namespace ASCOM.AstroK
             _txtApNombre = new TextBox { Left = 85, Top = 77, Width = 150 };
             var lblApPass = new Label { Tag = "wifi.password", Left = 245, Top = 80, Width = 80 };
             _txtApPass = new TextBox { Left = 330, Top = 77, Width = 120 };
+            // El PIN de Bluetooth se ve y se cambia solo por USB.
+            var btnPinBle = new Button { Tag = "ble.botonPin", Left = 460, Top = 75, Width = 110 };
+            btnPinBle.Click += (s, e) => GestionarPinBle();
+            pendientes.Add(btnPinBle);
 
             var lblTimeout = new Label { Tag = "wifi.timeout", Left = 15, Top = 112, Width = 90 };
             _numTimeout = new NumericUpDown { Left = 110, Top = 109, Width = 70, Minimum = 100, Maximum = 60000, Increment = 100 };
@@ -760,7 +764,7 @@ namespace ASCOM.AstroK
             var nota = new Label { Tag = "wifi.nota", Left = 15, Top = 368, Width = 555, Height = 75, ForeColor = Color.DimGray };
 
             tab.Controls.AddRange(new Control[] {
-                lblIpTitulo, _lblIp, btnIp, sep, lblAp, lblApNombre, _txtApNombre, lblApPass, _txtApPass,
+                lblIpTitulo, _lblIp, btnIp, sep, lblAp, lblApNombre, _txtApNombre, lblApPass, _txtApPass, btnPinBle,
                 lblTimeout, _numTimeout, lblRetries, _numRetries, _chkWifi, _chkBle, lblRedes, _gridRedes,
                 btnQuitar, btnRecargar, btnGuardar, nota
             });
@@ -788,6 +792,62 @@ namespace ASCOM.AstroK
                 if (modo == "STA") _lblIp.Text = string.Format(Textos.Get("wifi.modoSta"), ip);
                 else if (modo == "AP") _lblIp.Text = string.Format(Textos.Get("wifi.modoAp"), ip);
                 else _lblIp.Text = Textos.Get("wifi.sinRed");
+            });
+        }
+
+        /// <summary>
+        /// Ver, cambiar o borrar el PIN de Bluetooth del equipo. Solo por USB:
+        /// por ahí no se pide, y quien tiene el cable tiene el equipo delante.
+        /// </summary>
+        private void GestionarPinBle()
+        {
+            Proteger(() =>
+            {
+                if (_link.EsBluetooth)
+                {
+                    MessageBox.Show(this, Textos.Get("ble.pinSoloUsb"), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                string actual = _link.Query("BP");
+                using (var f = new Form
+                {
+                    Text = Text,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    StartPosition = FormStartPosition.CenterParent,
+                    MinimizeBox = false,
+                    MaximizeBox = false,
+                    ShowInTaskbar = false,
+                    ClientSize = new Size(380, 150)
+                })
+                {
+                    var lbl = new Label
+                    {
+                        Text = actual == "-" ? Textos.Get("ble.pinNinguno") : string.Format(Textos.Get("ble.pinActual"), actual),
+                        Left = 12, Top = 12, Width = 356, Height = 36
+                    };
+                    var lblNuevo = new Label { Text = Textos.Get("ble.pinCambiar"), Left = 12, Top = 60, Width = 150 };
+                    var txt = new TextBox { Left = 165, Top = 56, Width = 70, MaxLength = 4, Font = new Font(Font.FontFamily, 12) };
+                    var guardar = new Button { Text = Textos.Get("ble.pinGuardar"), Left = 245, Top = 55, Width = 123, Enabled = false, DialogResult = DialogResult.OK };
+                    var borrar = new Button { Text = Textos.Get("ble.pinBorrar"), Left = 12, Top = 110, Width = 150, DialogResult = DialogResult.Abort, Enabled = actual != "-" };
+                    var cerrar = new Button { Text = Textos.Get("ventana.cancelar"), Left = 288, Top = 110, Width = 80, DialogResult = DialogResult.Cancel };
+                    txt.TextChanged += (s, e) => guardar.Enabled = PinesBle.Valido(txt.Text);
+                    f.Controls.AddRange(new Control[] { lbl, lblNuevo, txt, guardar, borrar, cerrar });
+                    f.AcceptButton = guardar;
+                    f.CancelButton = cerrar;
+
+                    DialogResult r = f.ShowDialog(this);
+                    if (r == DialogResult.OK)
+                    {
+                        if (_link.Query("BP" + txt.Text) != "OK") throw new System.IO.IOException(Textos.Get("ble.pinError"));
+                        MessageBox.Show(this, string.Format(Textos.Get("ble.pinGuardado"), txt.Text), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else if (r == DialogResult.Abort)
+                    {
+                        if (_link.Query("BR") != "OK") throw new System.IO.IOException(Textos.Get("ble.pinError"));
+                        MessageBox.Show(this, Textos.Get("ble.pinBorrado"), Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
             });
         }
 
@@ -1441,10 +1501,7 @@ namespace ASCOM.AstroK
             ActualizarHabilitacion();
         }
 
-        /// <param name="trasEmparejar">Viene de emparejar: si aun así el
-        /// equipo no acepta el vínculo, se informa en vez de volver a pedir
-        /// el PIN en bucle.</param>
-        private void AlternarConexion(bool trasEmparejar = false)
+        private void AlternarConexion()
         {
             if (_link.IsOpen)
             {
@@ -1464,7 +1521,7 @@ namespace ASCOM.AstroK
                 return;
             }
 
-            bool emparejar = false;
+            BlePinException faltaPin = null;
             try
             {
                 Cursor = Cursors.WaitCursor;
@@ -1493,7 +1550,7 @@ namespace ASCOM.AstroK
             catch (Exception ex)
             {
                 _link.Close();
-                emparejar = ex is BleSinEmparejarException && !trasEmparejar;
+                faltaPin = ex as BlePinException;
                 _lblEstado.Tag = null;
                 _lblEstado.Text = string.Format(Textos.Get("foco.noConecta"), ex.Message);
                 _lblEstado.ForeColor = Color.Firebrick;
@@ -1505,60 +1562,24 @@ namespace ASCOM.AstroK
                 ActualizarTextoConectar();
             }
 
-            if (emparejar) EmparejarYConectar();
+            // Bluetooth sin PIN (o con uno que ya no vale): se pide y se
+            // vuelve a conectar. Cancelar deja la ventana desconectada.
+            if (faltaPin != null)
+            {
+                string pin = PedirPin(!faltaPin.PinDefinido, faltaPin.Incorrecto);
+                if (pin != null)
+                {
+                    PinesBle.Guardar(BleCanal.Direccion(ComPort), pin);
+                    AlternarConexion();
+                }
+            }
         }
 
         /// <summary>
-        /// Empareja por Bluetooth y, si sale bien, conecta. El equipo enseña
-        /// un PIN en su pantalla y aquí se pide. Va en segundo plano porque
-        /// Windows pide el PIN desde otro hilo y espera la respuesta: con la
-        /// ventana bloqueada no habría forma de enseñar el diálogo.
+        /// Pide el PIN de Bluetooth del equipo, o uno nuevo si aún no tiene.
+        /// null si se cancela.
         /// </summary>
-        private void EmparejarYConectar()
-        {
-            string puerto = ComPort;
-            _buscando = true; // bloquea buscar y conectar mientras tanto
-            ActualizarHabilitacion();
-            _lblEstado.Tag = "ble.emparejando";
-            _lblEstado.Text = Textos.Get("ble.emparejando");
-            _lblEstado.ForeColor = Color.DimGray;
-
-            System.Threading.Tasks.Task.Factory.StartNew(() =>
-            {
-                string fallo = null;
-                bool cancelado = false;
-                try { BleCanal.Emparejar(puerto, () => (string)Invoke(new Func<string>(PedirPin))); }
-                catch (OperationCanceledException) { cancelado = true; }
-                catch (Exception ex) { fallo = ex.Message; }
-
-                if (IsDisposed || !IsHandleCreated) return;
-                try
-                {
-                    BeginInvoke((Action)(() =>
-                    {
-                        _buscando = false;
-                        ActualizarHabilitacion();
-                        if (cancelado)
-                        {
-                            _lblEstado.Tag = "foco.desconectado";
-                            _lblEstado.Text = Textos.Get("foco.desconectado");
-                            _lblEstado.ForeColor = Color.DimGray;
-                        }
-                        else if (fallo != null)
-                        {
-                            _lblEstado.Tag = null;
-                            _lblEstado.Text = string.Format(Textos.Get("ble.errEmparejar"), fallo);
-                            _lblEstado.ForeColor = Color.Firebrick;
-                        }
-                        else AlternarConexion(true);
-                    }));
-                }
-                catch (ObjectDisposedException) { }
-            });
-        }
-
-        /// <summary>Pide el PIN que enseña el equipo. null si se cancela.</summary>
-        private string PedirPin()
+        private string PedirPin(bool nuevo, bool incorrecto)
         {
             using (var f = new Form
             {
@@ -1568,13 +1589,16 @@ namespace ASCOM.AstroK
                 MinimizeBox = false,
                 MaximizeBox = false,
                 ShowInTaskbar = false,
-                ClientSize = new Size(340, 130)
+                ClientSize = new Size(360, 150)
             })
             {
-                var lbl = new Label { Text = Textos.Get("ble.pinTexto"), Left = 12, Top = 12, Width = 316, Height = 34 };
-                var txt = new TextBox { Left = 12, Top = 52, Width = 120, MaxLength = 6, Font = new Font(Font.FontFamily, 14) };
-                var ok = new Button { Text = Textos.Get("ventana.aceptar"), Left = 158, Top = 94, Width = 80, DialogResult = DialogResult.OK };
-                var cancelar = new Button { Text = Textos.Get("ventana.cancelar"), Left = 248, Top = 94, Width = 80, DialogResult = DialogResult.Cancel };
+                string texto = Textos.Get(nuevo ? "ble.pinNuevo" : "ble.pinPedir");
+                if (incorrecto) texto = Textos.Get("ble.pinIncorrecto") + " " + texto;
+                var lbl = new Label { Text = texto, Left = 12, Top = 12, Width = 336, Height = 52 };
+                var txt = new TextBox { Left = 12, Top = 70, Width = 90, MaxLength = 4, Font = new Font(Font.FontFamily, 14) };
+                var ok = new Button { Text = Textos.Get("ventana.aceptar"), Left = 178, Top = 114, Width = 80, DialogResult = DialogResult.OK, Enabled = false };
+                var cancelar = new Button { Text = Textos.Get("ventana.cancelar"), Left = 268, Top = 114, Width = 80, DialogResult = DialogResult.Cancel };
+                txt.TextChanged += (s, e) => ok.Enabled = PinesBle.Valido(txt.Text);
                 f.Controls.AddRange(new Control[] { lbl, txt, ok, cancelar });
                 f.AcceptButton = ok;
                 f.CancelButton = cancelar;

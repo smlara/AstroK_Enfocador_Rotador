@@ -332,10 +332,8 @@ void setup() {
         alpacaServer.loop(); // Procesar clientes web mientras espera
         atenderSerial(); // ...y también el protocolo serie y BLE
 
-        // Salta la espera si se gira el encoder o se pulsa el botón, o si
-        // hay que enseñar el PIN de un emparejamiento BLE (lo pinta loop()).
-        if (manualControl.getUpdatedPosition(0, false) != 0 || digitalRead(PIN_ENC_SW) == LOW ||
-            bleLink.pinPendiente() >= 0) {
+        // Salta la espera si se gira el encoder o se pulsa el botón.
+        if (manualControl.getUpdatedPosition(0, false) != 0 || digitalRead(PIN_ENC_SW) == LOW) {
             break;
         }
         delay(5);
@@ -505,22 +503,6 @@ void loop() {
             ultimaActualizacionOled = millis();
         }
         return;
-    }
-
-    // PIN de emparejamiento BLE: se queda en pantalla mientras dure el
-    // emparejamiento, y se quita en cuanto acaba (bien o mal).
-    static long pinEnPantalla = -1;
-    long pinBle = bleLink.pinPendiente();
-    if (pinBle != pinEnPantalla) {
-        pinEnPantalla = pinBle;
-        if (pinBle >= 0) {
-            char texto[12];
-            snprintf(texto, sizeof(texto), "PIN %06ld", pinBle);
-            oled.mostrarMensaje(texto, 2);
-            tiempoMensajeHasta = millis() + 60000;
-        } else {
-            tiempoMensajeHasta = 0;
-        }
     }
 
     if (millis() < tiempoMensajeHasta) {

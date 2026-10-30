@@ -15,14 +15,65 @@ using Windows.Foundation;
 namespace ASCOM.AstroK
 {
     /// <summary>
-    /// El equipo no está emparejado con este PC (o lo estaba, pero el equipo
-    /// ha olvidado el vínculo tras un reset de fábrica). Hay que emparejarlo
-    /// desde la aplicación AstroK, que es la que puede pedir el PIN.
+    /// Falta el PIN de Bluetooth del equipo, o el guardado ya no vale. Lo
+    /// pide la aplicación AstroK; el driver ASCOM solo usa el que haya
+    /// guardado.
     /// </summary>
-    public class BleSinEmparejarException : IOException
+    public class BlePinException : IOException
     {
-        public BleSinEmparejarException()
-            : base("The device is not paired with this PC. Pair it first from the AstroK app.") { }
+        /// <summary>El equipo ya tiene PIN (si no, se elige uno nuevo).</summary>
+        public bool PinDefinido { get; private set; }
+        /// <summary>Se probó un PIN guardado y el equipo lo rechazó.</summary>
+        public bool Incorrecto { get; private set; }
+
+        public BlePinException(bool pinDefinido, bool incorrecto)
+            : base(incorrecto
+                ? "Wrong Bluetooth PIN. Connect from the AstroK app to enter it again."
+                : "Bluetooth PIN needed. Connect once from the AstroK app to enter it.")
+        {
+            PinDefinido = pinDefinido;
+            Incorrecto = incorrecto;
+        }
+    }
+
+    /// <summary>
+    /// PIN de Bluetooth de cada equipo, por dirección, en el registro del
+    /// usuario: lo comparten la aplicación y el driver ASCOM, que así no lo
+    /// vuelve a pedir.
+    /// </summary>
+    internal static class PinesBle
+    {
+        private const string Clave = @"Software\AstroK\Bluetooth";
+
+        private static string Nombre(ulong direccion)
+        {
+            return direccion.ToString("X12", CultureInfo.InvariantCulture);
+        }
+
+        public static string Leer(ulong direccion)
+        {
+            using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Clave))
+                return k == null ? null : k.GetValue(Nombre(direccion)) as string;
+        }
+
+        public static void Guardar(ulong direccion, string pin)
+        {
+            using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(Clave))
+                k.SetValue(Nombre(direccion), pin);
+        }
+
+        public static void Borrar(ulong direccion)
+        {
+            using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Clave, true))
+                if (k != null) k.DeleteValue(Nombre(direccion), false);
+        }
+
+        public static bool Valido(string pin)
+        {
+            if (pin == null || pin.Length != 4) return false;
+            foreach (char c in pin) if (c < '0' || c > '9') return false;
+            return true;
+        }
     }
 
     /// <summary>
@@ -31,9 +82,10 @@ namespace ASCOM.AstroK
     /// llegan como notificaciones de TX. Imita lo que DeviceLink usa de
     /// SerialPort, así el resto del código no distingue un canal del otro.
     ///
-    /// El firmware exige un enlace cifrado y autenticado: sin emparejar, el
-    /// equipo rechaza lo que se le escribe. El emparejamiento lo hace
-    /// Emparejar(), una sola vez; Windows guarda el vínculo.
+    /// Sin emparejamiento de Windows: al abrir se da el PIN de 4 cifras del
+    /// equipo (:BA#), el guardado en PinesBle. Sin él, o si el equipo lo
+    /// rechaza, lanza BlePinException. Un equipo sin PIN se queda con el
+    /// primero que recibe.
     ///
     /// Usa las APIs WinRT de Windows 10 directamente desde .NET Framework
     /// (Windows.winmd), sin paquetes NuGet.
@@ -99,21 +151,51 @@ namespace ASCOM.AstroK
                 for (int intento = 1; ; intento++)
                 {
                     try { Abrir(direccion); break; }
-                    catch (Exception ex) when (!(ex is BleSinEmparejarException) && intento < Intentos)
+                    catch (Exception) when (intento < Intentos)
                     {
                         SoltarConexion();
                         Thread.Sleep(1000);
                     }
                 }
+                Autenticar(direccion);
             }
             catch { Close(); throw; }
+        }
+
+        /// <summary>Da el PIN guardado; sin él, o si no vale, BlePinException.</summary>
+        private void Autenticar(ulong direccion)
+        {
+            bool definido = Pedir(":BQ#") == "1";
+            string pin = PinesBle.Leer(direccion);
+            if (!PinesBle.Valido(pin)) throw new BlePinException(definido, false);
+            if (Pedir(":BA" + pin + "#") == "OK") return;
+            // No vale (el PIN se cambió o se borró por USB): se olvida para
+            // que la aplicación lo pida otra vez.
+            PinesBle.Borrar(direccion);
+            throw new BlePinException(definido, true);
+        }
+
+        private string Pedir(string comando)
+        {
+            DiscardInBuffer();
+            Write(comando);
+            return ReadTo("#");
         }
 
         private void Abrir(ulong direccion)
         {
             _dispositivo = Esperar(BluetoothLEDevice.FromBluetoothAddressAsync(direccion), TimeoutConexionMs);
             if (_dispositivo == null) throw new IOException("Bluetooth device not found");
-            if (!_dispositivo.DeviceInformation.Pairing.IsPaired) throw new BleSinEmparejarException();
+            // Emparejado por la 2.1.0 (firmware 1.5.0, que emparejaba): ese
+            // vínculo ya no existe en el equipo y Windows intentaría cifrar con
+            // él. Se deshace.
+            if (_dispositivo.DeviceInformation.Pairing.IsPaired)
+            {
+                Esperar(_dispositivo.DeviceInformation.Pairing.UnpairAsync(), TimeoutConexionMs);
+                _dispositivo.Dispose();
+                _dispositivo = Esperar(BluetoothLEDevice.FromBluetoothAddressAsync(direccion), TimeoutConexionMs);
+                if (_dispositivo == null) throw new IOException("Bluetooth device not found");
+            }
 
             // Que Windows no suelte la conexión entre comando y comando: sin
             // esto la cierra al poco de quedarse sin tráfico, y el siguiente
@@ -127,10 +209,10 @@ namespace ASCOM.AstroK
                 Thread.Sleep(50);
             }
 
-            // Con la caché de Windows, no Uncached: ya emparejado, releer los
-            // servicios del equipo falla ("el dispositivo no reconoce el
-            // comando"). La primera vez la caché está vacía y Windows los lee
-            // igualmente; y la tabla del firmware no cambia.
+            // Con la caché de Windows, no Uncached: releer los servicios del
+            // equipo llegó a fallar ("el dispositivo no reconoce el comando").
+            // La primera vez la caché está vacía y Windows los lee igualmente;
+            // y la tabla del firmware no cambia.
             GattDeviceServicesResult servicios = Esperar(
                 _dispositivo.GetGattServicesForUuidAsync(Servicio, BluetoothCacheMode.Cached), TimeoutConexionMs);
             if (servicios.Status != GattCommunicationStatus.Success || servicios.Services.Count == 0)
@@ -146,18 +228,6 @@ namespace ASCOM.AstroK
                     GattClientCharacteristicConfigurationDescriptorValue.Notify), TimeoutConexionMs);
             if (st != GattCommunicationStatus.Success)
                 throw new IOException("Cannot subscribe to the device (" + st + ")");
-
-            // Escritura de prueba con confirmación: ":#" es un comando vacío,
-            // el firmware lo ignora. Las escrituras normales van sin
-            // confirmación y un rechazo por falta de emparejamiento no se
-            // vería; aquí sí, como error de protocolo.
-            GattWriteResult prueba = Esperar(
-                _rx.WriteValueWithResultAsync(Encoding.ASCII.GetBytes(":#").AsBuffer(), GattWriteOption.WriteWithResponse),
-                TimeoutConexionMs);
-            if (prueba.Status == GattCommunicationStatus.ProtocolError || prueba.Status == GattCommunicationStatus.AccessDenied)
-                throw new BleSinEmparejarException();
-            if (prueba.Status != GattCommunicationStatus.Success)
-                throw new IOException("Device not reachable (" + prueba.Status + ")");
 
             // 3 bytes de cabecera ATT por paquete.
             _trozo = Math.Max(20, _sesion.MaxPduSize - 3);
@@ -297,68 +367,12 @@ namespace ASCOM.AstroK
             if (_dispositivo != null) { try { _dispositivo.Dispose(); } catch { } _dispositivo = null; }
         }
 
-        // ---- Emparejamiento ----
-
-        /// <summary>
-        /// Empareja el equipo con este PC. El equipo genera un PIN y lo
-        /// enseña en su pantalla; pedirPin lo pregunta al usuario (null =
-        /// cancelar). Si ya estaba emparejado se deshace antes: es lo que hace
-        /// falta cuando el equipo ha olvidado el vínculo (reset de fábrica)
-        /// y Windows sigue creyendo que lo tiene.
-        ///
-        /// Bloquea hasta terminar y pedirPin se llama desde otro hilo: no
-        /// llamarlo desde el hilo de la ventana.
-        /// </summary>
-        public static void Emparejar(string puerto, Func<string> pedirPin)
-        {
-            ulong direccion = Direccion(puerto);
-            using (BluetoothLEDevice dispositivo = Esperar(BluetoothLEDevice.FromBluetoothAddressAsync(direccion), TimeoutConexionMs))
-            {
-                if (dispositivo == null) throw new IOException("Bluetooth device not found");
-
-                if (dispositivo.DeviceInformation.Pairing.IsPaired)
-                    Esperar(dispositivo.DeviceInformation.Pairing.UnpairAsync(), TimeoutConexionMs);
-
-                DeviceInformation info = Esperar(DeviceInformation.CreateFromIdAsync(dispositivo.DeviceId), TimeoutConexionMs);
-                DeviceInformationCustomPairing custom = info.Pairing.Custom;
-                bool cancelado = false;
-
-                TypedEventHandler<DeviceInformationCustomPairing, DevicePairingRequestedEventArgs> alPedir = (s, a) =>
-                {
-                    if (a.PairingKind != DevicePairingKinds.ProvidePin) { a.Accept(); return; }
-                    Deferral espera = a.GetDeferral();
-                    try
-                    {
-                        string pin = pedirPin();
-                        if (pin == null) cancelado = true;
-                        else a.Accept(pin.Trim());
-                    }
-                    finally { espera.Complete(); }
-                };
-
-                custom.PairingRequested += alPedir;
-                try
-                {
-                    // Sin límite de tiempo propio: el usuario está tecleando
-                    // el PIN, y la propia pila corta si tarda demasiado.
-                    DevicePairingResult r = custom.PairAsync(
-                        DevicePairingKinds.ProvidePin | DevicePairingKinds.ConfirmOnly,
-                        DevicePairingProtectionLevel.EncryptionAndAuthentication).AsTask().GetAwaiter().GetResult();
-
-                    if (cancelado) throw new OperationCanceledException();
-                    if (r.Status != DevicePairingResultStatus.Paired && r.Status != DevicePairingResultStatus.AlreadyPaired)
-                        throw new IOException("Pairing failed (" + r.Status + ")");
-                }
-                finally { custom.PairingRequested -= alPedir; }
-            }
-        }
-
         // ---- Búsqueda ----
 
         /// <summary>
         /// Escucha anuncios BLE durante un rato y devuelve los AstroK del modo
         /// pedido. El modo viaja en los datos de fabricante, así que no hace
-        /// falta conectar (ni estar emparejado) para filtrar. Un equipo que ya
+        /// falta conectar para filtrar. Un equipo que ya
         /// tenga conectado otro programa no se anuncia y no aparece.
         /// </summary>
         public static List<EquipoEncontrado> Buscar(bool rotador, int duracionMs)

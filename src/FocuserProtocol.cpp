@@ -111,6 +111,13 @@ void FocuserProtocol::ejecutarComando(String cmd) {
     codigo.toUpperCase();
     String params = (cmd.length() > 2) ? cmd.substring(2) : "";
 
+    // Por BLE, hasta dar el PIN solo se atiende lo necesario para darlo.
+    bool porBle = (_out == &bleLink);
+    if (porBle && !bleLink.autenticado() && codigo != "BQ" && codigo != "BA") {
+        _out->print("ER:PIN#");
+        return;
+    }
+
     // 2. Máquina de estados / Despachador (Switch por primera letra)
     switch (codigo[0]) {
         case 'G': // GETTERS
@@ -238,9 +245,9 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 // suele ser justo aquel en el que no hay forma de llegar por
                 // red al equipo.
                 preferences.remove("config");
-                // Los vínculos BLE también: tras un reset de fábrica nadie
-                // debería seguir pudiendo conectar sin volver a emparejarse.
-                bleLink.olvidarEmparejamientos();
+                // El PIN de BLE también: tras un reset de fábrica, el primero
+                // que conecte por BLE elige uno nuevo.
+                bleLink.borrarPin();
                 _out->print("OK#");
                 _out->flush();
                 delay(200);
@@ -276,6 +283,36 @@ void FocuserProtocol::ejecutarComando(String cmd) {
                 _out->print(";");
                 _out->print(CONFIG_IDF_FIRMWARE_CHIP_ID);
                 _out->print("#");
+            }
+            break;
+
+        case 'B': // BLUETOOTH: PIN de acceso (ver BleLink.h)
+            if (codigo == "BQ") {
+                // ¿Tiene ya PIN? Así la app sabe si pedirlo o pedir uno nuevo.
+                _out->print(bleLink.pinDefinido() ? "1#" : "0#");
+            }
+            else if (codigo == "BA") {
+                // Por USB no hace falta: se contesta OK sin mirar.
+                if (!porBle || bleLink.autenticar(params)) _out->print("OK#");
+                else if (!BleLink::pinValido(params)) _out->print("ER:PARAMS#");
+                else _out->print("ER:PIN#");
+            }
+            else if (porBle) {
+                // Ver, cambiar o borrar el PIN solo por USB: quien tiene el
+                // cable tiene el equipo en la mano.
+                _out->print("ER#");
+            }
+            else if (codigo == "BP") {
+                if (params.length() == 0) {
+                    _out->print(bleLink.pinDefinido() ? bleLink.pin() : String("-"));
+                    _out->print("#");
+                } else {
+                    _out->print(bleLink.fijarPin(params) ? "OK#" : "ER:PARAMS#");
+                }
+            }
+            else if (codigo == "BR") {
+                bleLink.borrarPin();
+                _out->print("OK#");
             }
             break;
 

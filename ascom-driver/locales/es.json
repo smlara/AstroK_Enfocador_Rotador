@@ -124,8 +124,18 @@
   "fw.confirmar": "Se va a grabar {0} en el equipo.\n\nNo desconectes el USB hasta que termine; el equipo se reiniciará solo.\n\n¿Continuar?",
   "fw.noCerrar": "Se está grabando el firmware. Espera a que termine antes de cerrar la ventana.",
   "wifi.bleActivado": "Bluetooth activado",
-  "ble.emparejando": "Emparejando por Bluetooth: teclea el PIN que aparece en la pantalla del equipo.",
-  "ble.pinTexto": "Teclea el PIN de 6 cifras que aparece ahora\nen la pantalla del equipo:",
-  "ble.errEmparejar": "No se pudo emparejar: {0}",
-  "ble.confirmarApagar": "Estás conectado por Bluetooth. Si lo desactivas, después de reiniciar\nsolo podrás conectar por USB o por WiFi.\n\n¿Continuar?"
+  "ble.confirmarApagar": "Estás conectado por Bluetooth. Si lo desactivas, después de reiniciar\nsolo podrás conectar por USB o por WiFi.\n\n¿Continuar?",
+  "ble.pinNuevo": "Este equipo aún no tiene PIN de Bluetooth. Elige uno de 4 cifras: se pedirá al conectar por Bluetooth desde otro programa u otro PC.",
+  "ble.pinPedir": "Teclea el PIN de Bluetooth de este equipo (4 cifras). Si no lo recuerdas, conecta por USB y míralo en la pestaña WiFi / Bluetooth.",
+  "ble.pinIncorrecto": "PIN incorrecto.",
+  "ble.botonPin": "PIN Bluetooth…",
+  "ble.pinSoloUsb": "El PIN de Bluetooth solo se puede ver o cambiar conectado por USB.",
+  "ble.pinNinguno": "El equipo no tiene PIN de Bluetooth: lo elegirá la primera conexión por Bluetooth.",
+  "ble.pinActual": "PIN de Bluetooth actual: {0}",
+  "ble.pinCambiar": "PIN nuevo (4 cifras):",
+  "ble.pinGuardar": "Guardar",
+  "ble.pinBorrar": "Borrar PIN",
+  "ble.pinError": "El equipo no aceptó el cambio de PIN.",
+  "ble.pinGuardado": "PIN de Bluetooth cambiado a {0}.",
+  "ble.pinBorrado": "PIN de Bluetooth borrado. La próxima conexión por Bluetooth elegirá uno nuevo."
 }

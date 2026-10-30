@@ -22,14 +22,16 @@
  * Una sola conexión a la vez. Lo escrito se envía al llegar el '#' que cierra
  * cada respuesta, o con flush().
  *
- * Seguridad: RX exige un enlace cifrado y autenticado, así que solo un equipo
- * emparejado puede mandar comandos. El emparejamiento es por clave: el equipo
- * genera un PIN de 6 cifras al azar, lo enseña en la OLED (pinPendiente()) y
- * el PC lo teclea. El vínculo queda guardado en NVS por los dos lados.
+ * Acceso: sin emparejamiento BLE (con Windows daba más problemas de los que
+ * resolvía). En su lugar, un PIN de 4 cifras guardado en NVS: cada conexión
+ * BLE tiene que darlo con :BA<pin># antes de que se le acepte ningún otro
+ * comando. Si el equipo aún no tiene PIN, el primero que llega con :BA se
+ * queda como PIN. Por USB no se pide nunca, y por USB se puede ver, cambiar
+ * o borrar (:BP#, :BR#). El enlace no va cifrado: protege de que cualquiera
+ * con un móvil mueva el motor, no de quien escuche el aire.
  *
  * El anuncio lleva datos de fabricante 0xFFFF 'A' 'K' <'F'|'R'>: el modo del
- * equipo, para que la app filtre enfocadores y rotadores sin conectar (antes
- * de emparejar no podría preguntar :DM#).
+ * equipo, para que la app filtre enfocadores y rotadores sin conectar.
  */
 class BleLink : public Stream {
 public:
@@ -37,11 +39,20 @@ public:
     void begin(const String& nombre, bool rotador);
     bool activo() const;
     bool conectado() const;
-    // PIN que el PC tiene que teclear para emparejarse, o -1 si no hay un
-    // emparejamiento en curso.
-    long pinPendiente() const;
-    // Borra los vínculos guardados: el PC tendrá que volver a emparejarse.
-    void olvidarEmparejamientos();
+
+    // PIN de acceso. Sin PIN guardado, pin() devuelve "".
+    bool pinDefinido() const;
+    String pin() const;
+    // Guarda un PIN nuevo (4 cifras). false si no tiene ese formato.
+    bool fijarPin(const String& pin);
+    void borrarPin();
+    static bool pinValido(const String& pin);
+
+    // La conexión actual ya ha dado el PIN.
+    bool autenticado() const;
+    // :BA<pin>#. Sin PIN guardado, este se queda como PIN. Tras varios fallos
+    // seguidos corta la conexión, para que probar los 10000 no salga gratis.
+    bool autenticar(const String& pin);
 
     int available() override;
     int read() override;

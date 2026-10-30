@@ -41,8 +41,8 @@
  *                /api/setup/config) codificado en base64, terminado en '#'.
  * :CS<b64>#   -> Set Config. Recibe ese JSON en base64, lo valida y lo guarda.
  *                Responde OK# o ER#. Los cambios de WiFi piden reinicio.
- * :CR#        -> Reset de fábrica: borra la configuración de NVS y los
- *                emparejamientos BLE, y reinicia.
+ * :CR#        -> Reset de fábrica: borra la configuración de NVS y el PIN
+ *                de Bluetooth, y reinicia.
  *                Responde OK# antes de reiniciar. El siguiente arranque
  *                recrea los valores por defecto.
  * :DM#        -> Modo en que arrancó el equipo: "FOCUSER#" o "ROTATOR#". Lo
@@ -55,6 +55,14 @@
  * :WI#        -> Estado de red: "STA:<ip>#", "AP:<ip>#" u "OFF:0.0.0.0#".
  * :WR#        -> Reinicia el equipo (para aplicar la configuración de WiFi).
  * :DH#        -> Para qué se compiló: "<motor>;<chip_id>#", p. ej. "35BY48;5#".
+ * :BQ#        -> ¿Tiene PIN de Bluetooth? "1#" o "0#".
+ * :BA<pin>#   -> Da el PIN (4 cifras) en una conexión BLE: "OK#", "ER:PIN#" o
+ *                "ER:PARAMS#". Sin PIN guardado, este se queda como PIN. Hasta
+ *                dar el PIN, por BLE todo lo demás responde "ER:PIN#"; tras 3
+ *                fallos se corta la conexión. Por USB no se pide (OK# siempre).
+ * :BP#        -> Solo USB: el PIN guardado, o "-#" si no hay.
+ * :BP<pin>#   -> Solo USB: fija el PIN. "OK#" o "ER:PARAMS#".
+ * :BR#        -> Solo USB: borra el PIN; la próxima conexión BLE elige uno.
  * :UB<tam>,<md5>#  :UD<offset hex>,<b64>#  :UE#  :UA#  :US#
  *             -> Actualización de firmware por USB a la partición OTA libre.
  *                Ver atenderActualizacion() en FocuserProtocol.cpp.
