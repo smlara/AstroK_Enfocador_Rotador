@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<driversList>
+    <devGroup group="Focusers">
+        <device label="AstroK Focuser" manufacturer="AstroK">
+            <driver name="AstroK Focuser">indi_astrok_focuser</driver>
+            <version>1.0</version>
+        </device>
+    </devGroup>
+    <devGroup group="Rotators">
+        <device label="AstroK Rotator" manufacturer="AstroK">
+            <driver name="AstroK Rotator">indi_astrok_rotator</driver>
+            <version>1.0</version>
+        </device>
+    </devGroup>
+</driversList>
