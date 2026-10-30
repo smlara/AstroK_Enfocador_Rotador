@@ -18,7 +18,7 @@ Download `indi-astrok_<version>_arm64.deb` from https://astrok.eu/ascom/ (built
 for 64-bit Raspberry Pi OS / Debian 13, as used by PINS) and install it:
 
 ```bash
-sudo apt install ./indi-astrok_1.0.0_arm64.deb
+sudo apt install ./indi-astrok_<version>_arm64.deb
 ```
 
 Then restart the INDI client (or PINS) so it reloads the driver list.

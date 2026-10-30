@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 # La versión de los drivers INDI va aparte del firmware y de la app de
 # Windows, como esas dos entre sí. De aquí salen la de los drivers
 # (DRIVER_VERSION), la de indi_astrok.xml y la del paquete .deb.
-project(indi-astrok VERSION 1.0.0 LANGUAGES CXX)
+project(indi-astrok VERSION 1.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
