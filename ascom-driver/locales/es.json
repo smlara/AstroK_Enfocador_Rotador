@@ -125,7 +125,7 @@
   "fw.noCerrar": "Se está grabando el firmware. Espera a que termine antes de cerrar la ventana.",
   "wifi.bleActivado": "Bluetooth activado",
   "ble.emparejando": "Emparejando por Bluetooth: teclea el PIN que aparece en la pantalla del equipo.",
-  "ble.pinTexto": "Teclea el PIN de 4 cifras que aparece ahora\nen la pantalla del equipo:",
+  "ble.pinTexto": "Teclea el PIN de 6 cifras que aparece ahora\nen la pantalla del equipo:",
   "ble.errEmparejar": "No se pudo emparejar: {0}",
   "ble.confirmarApagar": "Estás conectado por Bluetooth. Si lo desactivas, después de reiniciar\nsolo podrás conectar por USB o por WiFi.\n\n¿Continuar?"
 }

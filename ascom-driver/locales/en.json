@@ -125,7 +125,7 @@
   "fw.noCerrar": "The firmware is being flashed. Wait for it to finish before closing the window.",
   "wifi.bleActivado": "Bluetooth enabled",
   "ble.emparejando": "Pairing over Bluetooth: type the PIN shown on the device display.",
-  "ble.pinTexto": "Type the 4-digit PIN now shown\non the device display:",
+  "ble.pinTexto": "Type the 6-digit PIN now shown\non the device display:",
   "ble.errEmparejar": "Pairing failed: {0}",
   "ble.confirmarApagar": "You are connected over Bluetooth. If you turn it off, after the restart\nyou will only be able to connect over USB or WiFi.\n\nContinue?"
 }

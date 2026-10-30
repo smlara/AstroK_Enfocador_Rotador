@@ -515,7 +515,7 @@ void loop() {
         pinEnPantalla = pinBle;
         if (pinBle >= 0) {
             char texto[12];
-            snprintf(texto, sizeof(texto), "PIN %04ld", pinBle);
+            snprintf(texto, sizeof(texto), "PIN %06ld", pinBle);
             oled.mostrarMensaje(texto, 2);
             tiempoMensajeHasta = millis() + 60000;
         } else {

@@ -1572,7 +1572,7 @@ namespace ASCOM.AstroK
             })
             {
                 var lbl = new Label { Text = Textos.Get("ble.pinTexto"), Left = 12, Top = 12, Width = 316, Height = 34 };
-                var txt = new TextBox { Left = 12, Top = 52, Width = 120, MaxLength = 4, Font = new Font(Font.FontFamily, 14) };
+                var txt = new TextBox { Left = 12, Top = 52, Width = 120, MaxLength = 6, Font = new Font(Font.FontFamily, 14) };
                 var ok = new Button { Text = Textos.Get("ventana.aceptar"), Left = 158, Top = 94, Width = 80, DialogResult = DialogResult.OK };
                 var cancelar = new Button { Text = Textos.Get("ventana.cancelar"), Left = 248, Top = 94, Width = 80, DialogResult = DialogResult.Cancel };
                 f.Controls.AddRange(new Control[] { lbl, txt, ok, cancelar });

@@ -24,7 +24,7 @@
  *
  * Seguridad: RX exige un enlace cifrado y autenticado, así que solo un equipo
  * emparejado puede mandar comandos. El emparejamiento es por clave: el equipo
- * genera un PIN de 4 cifras al azar, lo enseña en la OLED (pinPendiente()) y
+ * genera un PIN de 6 cifras al azar, lo enseña en la OLED (pinPendiente()) y
  * el PC lo teclea. El vínculo queda guardado en NVS por los dos lados.
  *
  * El anuncio lleva datos de fabricante 0xFFFF 'A' 'K' <'F'|'R'>: el modo del

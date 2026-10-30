@@ -41,10 +41,8 @@ class ServidorCallbacks : public NimBLEServerCallbacks {
     // La pila pide la clave que va a enseñar (somos DISPLAY_ONLY). Una nueva
     // en cada intento: una fija se acaba sabiendo, y no hay teclado para
     // cambiarla. loop() la pinta, no esta tarea: la OLED no es reentrante.
-    // BLE admite hasta 999999; con 4 cifras basta para quien tiene el equipo
-    // delante, y en el PC "1234" vale lo mismo que "001234".
     uint32_t onPassKeyRequest() override {
-        uint32_t clave = esp_random() % 10000;
+        uint32_t clave = esp_random() % 1000000;
         pin = (long)clave;
         return clave;
     }
