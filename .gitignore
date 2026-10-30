@@ -7,3 +7,4 @@
 pcb/debug.log
 bin/*.bin
 bin/*.exe
+bin/*.deb

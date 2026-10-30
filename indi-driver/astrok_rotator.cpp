@@ -14,7 +14,7 @@ static double normalizar(double grados)
 
 AstroKRotator::AstroKRotator() : comun(*this, true)
 {
-    setVersion(1, 0);
+    setVersion(ASTROK_VERSION_MAYOR, ASTROK_VERSION_MENOR);
     // La conexión la lleva AstroKComun: USB abierto a mano (el conector serie
     // de INDI resetea el C3 al conectar) o BLE.
     setRotatorConnection(CONNECTION_NONE);

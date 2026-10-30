@@ -76,4 +76,27 @@ usort($apps, function ($a, $b) {
     return version_compare($b['version'], $a['version']) ?: strcmp($a['product'], $b['product']);
 });
 
-echo json_encode(['firmwares' => $firmwares, 'apps' => $apps], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+// Paquetes de los drivers INDI para Linux (los nombres los pone
+// scripts/build_indi.ps1): indi-astrok_<x.y.z>_<arquitectura>.deb. Un solo
+// paquete lleva enfocador y rotador.
+$indi = [];
+foreach (glob($dir . '/*.deb') as $ruta) {
+    $nombre = basename($ruta);
+    if (!preg_match('/^indi-astrok_(\d+\.\d+\.\d+)_([a-z0-9]+)\.deb$/', $nombre, $m)) {
+        continue;
+    }
+    $indi[] = [
+        'file'     => $nombre,
+        'url'      => $base . rawurlencode($nombre),
+        'version'  => $m[1],
+        'arch'     => $m[2],
+        'size'     => filesize($ruta),
+        'sha256'   => hash_file('sha256', $ruta),
+        'modified' => gmdate('c', filemtime($ruta)),
+    ];
+}
+usort($indi, function ($a, $b) {
+    return version_compare($b['version'], $a['version']) ?: strcmp($a['arch'], $b['arch']);
+});
+
+echo json_encode(['firmwares' => $firmwares, 'apps' => $apps, 'indi' => $indi], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

@@ -12,14 +12,25 @@ needed.
 The mode is set by the jumper on the board; each driver checks it on connect
 and refuses a device that started in the other mode.
 
-## Requirements
+## Install the package
+
+Download `indi-astrok_<version>_arm64.deb` from https://astrok.eu/ascom/ (built
+for 64-bit Raspberry Pi OS / Debian 13, as used by PINS) and install it:
+
+```bash
+sudo apt install ./indi-astrok_1.0.0_arm64.deb
+```
+
+Then restart the INDI client (or PINS) so it reloads the driver list.
+
+## Build from source
+
+Requirements:
 
 - INDI **2.0 or later** (`libindi-dev`). Some distributions still ship 1.9.x,
   which these drivers do not build against.
 - GLib/GIO (`libglib2.0-dev`) and BlueZ (`bluetoothd` running) for Bluetooth.
 - CMake 3.18+ and a C++17 compiler.
-
-## Build and install
 
 ```bash
 cd indi-driver
@@ -30,6 +41,22 @@ sudo cmake --install build
 
 This installs both drivers and `indi_astrok.xml` in `/usr/share/indi`, so INDI
 clients list them under Focusers and Rotators, manufacturer AstroK.
+
+To build the `.deb` instead: `cmake --build build && cd build && cpack -G DEB`
+(needs `dpkg-dev`). Releases are built on the target machine with
+`scripts/build_indi.ps1 -Equipo user@host`, which leaves the package in `bin/`.
+
+## Configuring the device
+
+There is no separate setup window as in Windows: in INDI, every setting is a
+property of the driver, shown in the client's device control panel (KStars:
+*INDI Control Panel*; other clients have an equivalent). The tabs are
+described below. From a terminal, the same properties can be read and set
+with `indi_getprop` and `indi_setprop`, for example:
+
+```bash
+indi_setprop "AstroK Rotator.ASTROK_MOTOR.CURRENT_MA=600"
+```
 
 ## Connecting
 
