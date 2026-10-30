@@ -58,6 +58,9 @@ set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
 set(CPACK_DEBIAN_PACKAGE_SECTION science)
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://astrok.eu")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ${ASTROK_DEB_SHLIBDEPS})
+# libindi1 no trae fichero shlibs (medido en PINS, INDI 2.2.3), así que
+# dpkg-shlibdeps no la pone sola. Se suma a las que sí saca.
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libindi1 (>= 2.0)")
 # Sin bluetoothd no hay BLE, pero por USB funciona igual.
 set(CPACK_DEBIAN_PACKAGE_RECOMMENDS bluez)
 # indi-astrok_1.0.0_arm64.deb

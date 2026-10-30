@@ -31,28 +31,42 @@ Remove-Item $tar -ErrorAction SilentlyContinue
 & tar.exe -c -f $tar -C $raiz --exclude 'indi-driver/build' indi-driver
 if ($LASTEXITCODE -ne 0) { throw "No se pudo empaquetar indi-driver." }
 
-Write-Host "Copiando las fuentes a $Equipo..." -ForegroundColor Cyan
-& scp @ssh -q $tar "${Equipo}:/tmp/astrok-indi-src.tar"
-if ($LASTEXITCODE -ne 0) { throw "No se pudo copiar a $Equipo." }
-Remove-Item $tar
+# El script remoto va como fichero y no como argumento de ssh: PowerShell
+# 5.1 quita las comillas dobles de los argumentos de un programa externo.
+# Con saltos LF, que bash no entiende los CRLF de Windows.
+$remoto = @'
+set -e
+for p in cmake g++ pkg-config dpkg-shlibdeps; do
+    command -v $p >/dev/null || { echo "Falta $p (apt install cmake g++ pkg-config dpkg-dev)"; exit 2; }
+done
+pkg-config --atleast-version=2.0 libindi || { echo "Falta libindi-dev 2.0 o posterior"; exit 2; }
+pkg-config --exists gio-2.0 gio-unix-2.0 || { echo "Falta libglib2.0-dev"; exit 2; }
+chmod -R u+rwX ~/astrok-indi-build 2>/dev/null || true
+rm -rf ~/astrok-indi-build
+mkdir -p ~/astrok-indi-build
+# El tar.exe de Windows guarda los directorios sin permiso de escritura y
+# con atributos propios (SCHILY.fflags) que GNU tar no conoce.
+tar -x --warning=no-unknown-keyword -f /tmp/astrok-indi-src.tar -C ~/astrok-indi-build
+chmod -R u+rwX ~/astrok-indi-build
+rm -f /tmp/astrok-indi-src.tar /tmp/astrok-indi-build.sh
+cd ~/astrok-indi-build/indi-driver
+cmake -B build -DCMAKE_BUILD_TYPE=Release >/dev/null
+cmake --build build -j4 > build.log 2>&1 || { grep -E "error" build.log; exit 1; }
+grep -E "warning" build.log || true
+cd build
+cpack -G DEB >/dev/null
+ls indi-astrok_*.deb
+'@
+$guion = Join-Path $env:TEMP 'astrok-indi-build.sh'
+[IO.File]::WriteAllText($guion, $remoto.Replace("`r`n", "`n"))
 
-# Todo en una línea por ssh: sin CRLF de Windows que rompan el script remoto.
-$remoto = @(
-    'set -e',
-    'for p in cmake g++ pkg-config dpkg-shlibdeps; do command -v $p >/dev/null || { echo "Falta $p (apt install cmake g++ pkg-config dpkg-dev)"; exit 2; }; done',
-    'pkg-config --atleast-version=2.0 libindi || { echo "Falta libindi-dev 2.0 o posterior"; exit 2; }',
-    'pkg-config --exists gio-2.0 gio-unix-2.0 || { echo "Falta libglib2.0-dev"; exit 2; }',
-    'rm -rf ~/astrok-indi-build && mkdir -p ~/astrok-indi-build',
-    'tar -x -f /tmp/astrok-indi-src.tar -C ~/astrok-indi-build && rm /tmp/astrok-indi-src.tar',
-    'cd ~/astrok-indi-build/indi-driver',
-    'cmake -B build -DCMAKE_BUILD_TYPE=Release >/dev/null',
-    'cmake --build build -j4 2>&1 | grep -E "error|warning" || true',
-    'cd build && cpack -G DEB >/dev/null',
-    'ls indi-astrok_*.deb'
-) -join ' && '
+Write-Host "Copiando las fuentes a $Equipo..." -ForegroundColor Cyan
+& scp @ssh -q $tar $guion "${Equipo}:/tmp/"
+if ($LASTEXITCODE -ne 0) { throw "No se pudo copiar a $Equipo." }
+Remove-Item $tar, $guion
 
 Write-Host "Compilando y empaquetando..." -ForegroundColor Cyan
-$salida = & ssh @ssh $Equipo $remoto
+$salida = & ssh @ssh $Equipo 'bash /tmp/astrok-indi-build.sh'
 if ($LASTEXITCODE -ne 0) { $salida | ForEach-Object { Write-Host $_ }; throw "Fallo en $Equipo." }
 $deb = ($salida | Where-Object { $_ -match '^indi-astrok_.*\.deb$' } | Select-Object -Last 1)
 if (-not $deb) { $salida | ForEach-Object { Write-Host $_ }; throw "No se generó el .deb." }
