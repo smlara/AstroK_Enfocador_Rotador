@@ -10,6 +10,6 @@ using System.Reflection;
 //   - AppVersion de installer-focuser.iss e installer-rotator.iss
 // DriverVersion de Driver.cs y Rotator.cs va aparte: ASCOM lo define como
 // "m.n", dos componentes, asi que va en 2.1 y no sigue al parche.
-[assembly: AssemblyVersion("2.1.0.0")]
-[assembly: AssemblyFileVersion("2.1.0.0")]
+[assembly: AssemblyVersion("2.1.1.0")]
+[assembly: AssemblyFileVersion("2.1.1.0")]
 [assembly: AssemblyProduct("AstroK")]
