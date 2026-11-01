@@ -3,7 +3,7 @@
 
 ManualEncoder::ManualEncoder(uint8_t clkPin, uint8_t dtPin, uint8_t swPin)
     : _clk(clkPin), _dt(dtPin), _sw(swPin), _currentState(MULT_1), _resetRequested(false),
-      _stopRequested(false), _lastClkState(HIGH), _restoPasos(0.0f),
+      _stopRequested(false), _actividad(false), _lastClkState(HIGH), _restoPasos(0.0f),
       _botonCrudo(0), _botonEstable(0), _botonCambio(0), _botonRepetir(0),
       _buttonPressStartTime(0), _isPressed(false), _actionTaken(false),
       _lastButtonChangeTime(0)
@@ -33,6 +33,14 @@ bool ManualEncoder::checkResetRequest() {
     return false;
 }
 
+bool ManualEncoder::checkActividad() {
+    if (_actividad) {
+        _actividad = false;
+        return true;
+    }
+    return false;
+}
+
 bool ManualEncoder::checkStopRequest() {
     if (_stopRequested) {
         _stopRequested = false;
@@ -50,6 +58,7 @@ long ManualEncoder::getUpdatedPosition(long currentTarget, bool isMoving)
       // Flanco de bajada (empieza pulsación)
       if (millis() - _lastButtonChangeTime > 50) { // Antirrebote inicial
           _isPressed = true;
+          _actividad = true;
           _buttonPressStartTime = millis();
           _actionTaken = false;
       }
@@ -105,6 +114,7 @@ long ManualEncoder::getUpdatedPosition(long currentTarget, bool isMoving)
   // 0.1 grado no es un número entero de micropasos.
   int direccion = leerBotones();
   if (direccion != 0) {
+      _actividad = true;
       _restoPasos += direccion * pasosPorClic();
       long pasosEnteros = lroundf(_restoPasos);
       _restoPasos -= (float)pasosEnteros;
@@ -120,6 +130,7 @@ long ManualEncoder::getUpdatedPosition(long currentTarget, bool isMoving)
   // Generalmente con encoders mecánicos detectar solo de HIGH a LOW es suficiente para dar un "clic" seguro.
   if (clkState != _lastClkState && clkState == LOW) {
       int dtState = digitalRead(_dt);
+      _actividad = true;
 
       float pasosASumar = pasosPorClic();
 

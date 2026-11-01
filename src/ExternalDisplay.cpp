@@ -2,7 +2,8 @@
 #include "Config.h"
 
 ExternalDisplay::ExternalDisplay()
-    : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), _enabled(false) {}
+    : display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET), _enabled(false),
+      _encendida(true), _fijo(false), _tamMensaje(1), _encendidaHasta(0) {}
 
 void ExternalDisplay::begin()
 {
@@ -19,6 +20,29 @@ void ExternalDisplay::begin()
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     display.display();
+    _encendidaHasta = millis() + OLED_ENCENDIDA_INICIO_MS;
+}
+
+void ExternalDisplay::encender(bool on)
+{
+    if (on == _encendida) return; // cada comando es una transaccion I2C
+    display.ssd1306_command(on ? SSD1306_DISPLAYON : SSD1306_DISPLAYOFF);
+    _encendida = on;
+}
+
+void ExternalDisplay::mantenerEncendida(unsigned long ms)
+{
+    unsigned long hasta = millis() + ms;
+    if ((long)(hasta - _encendidaHasta) > 0) _encendidaHasta = hasta;
+    encender(true);
+}
+
+void ExternalDisplay::despertar()
+{
+    if (!_enabled)
+        return;
+    _fijo = false;
+    mantenerEncendida(OLED_ENCENDIDA_MOVIMIENTO_MS);
 }
 
 void ExternalDisplay::dibujarCabecera()
@@ -47,6 +71,12 @@ void ExternalDisplay::actualizar(long posActual, long posTarget, int multiplicad
 {
     if (!_enabled)
         return;
+
+    if (moviendo) mantenerEncendida(OLED_ENCENDIDA_MOVIMIENTO_MS);
+    if ((long)(millis() - _encendidaHasta) >= 0) encender(false);
+    // Apagada no se redibuja: se ahorran los ~25 ms de I2C de display()
+    if (!_encendida) return;
+
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
 
@@ -103,10 +133,25 @@ void ExternalDisplay::actualizar(long posActual, long posTarget, int multiplicad
     display.display();
 }
 
-void ExternalDisplay::mostrarMensaje(String msg, uint8_t size)
+void ExternalDisplay::mostrarMensaje(String msg, uint8_t size, bool fijo)
 {
     if (!_enabled)
         return;
+    _mensaje = msg;
+    _tamMensaje = size;
+    if (fijo) _fijo = true;
+    // Se enciende aunque el motor este parado, para que se vea. Mientras sea
+    // fijo, actualizar() no la apaga.
+    mantenerEncendida(OLED_ENCENDIDA_MOVIMIENTO_MS);
+    refrescarMensaje();
+}
+
+void ExternalDisplay::refrescarMensaje()
+{
+    if (!_enabled)
+        return;
+    String msg = _mensaje;
+    uint8_t size = _tamMensaje;
 
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
@@ -129,6 +174,7 @@ void ExternalDisplay::mostrarProgreso(int porcentaje, bool web)
         return;
     if (porcentaje < 0) porcentaje = 0;
     if (porcentaje > 100) porcentaje = 100;
+    mantenerEncendida(OLED_ENCENDIDA_MOVIMIENTO_MS);
 
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);

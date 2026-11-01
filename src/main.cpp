@@ -283,7 +283,7 @@ void setup() {
     bool forceAP = false;
     if (digitalRead(PIN_ENC_SW) == LOW) {
         forceAP = true;
-        oled.mostrarMensaje("FORZANDO AP...", 2);
+        oled.mostrarMensaje("FORZANDO AP...", 2, false);
         delay(1000);
     }
 
@@ -348,14 +348,17 @@ void setup() {
 void loop() {
     alpacaServer.loop();
     
-    static unsigned long tiempoMensajeHasta = 0;
-
     // 1. Comunicación PC
     protocolo.procesarSerial();
     protocolo.procesarBle();
 
     // 2. Control Manual (Solo si está activado en el .ini)
     targetPos = manualControl.getUpdatedPosition(targetPos, stepper.distanceToGo() != 0);
+
+    // Tocar el encoder o el botón enciende la pantalla y quita el aviso que
+    // hubiera. Se mira antes de los avisos de abajo (STOP, RESET POS.), que
+    // salen al soltar o al mantener el botón, no al empezar a pulsarlo.
+    if (manualControl.checkActividad()) oled.despertar();
 
     // El encoder no tenía límites (a diferencia de ALPACA, que sí los aplica
     // en /move y /sync). En Focuser se acota a [PASOS_MINIMOS, PASOS_MAXIMOS];
@@ -379,7 +382,6 @@ void loop() {
         // frenazo brusco, por eso él usa currentPosition() a propósito).
         targetPos = stepper.targetPosition();
         oled.mostrarMensaje("STOP", 2);
-        tiempoMensajeHasta = millis() + 1000;
     }
 
     // Verificar si se ha solicitado resetear la posición (pulsación larga)
@@ -397,7 +399,6 @@ void loop() {
             ultimaPosGuardada = 0;
         }
         oled.mostrarMensaje("RESET POS.", 2);
-        tiempoMensajeHasta = millis() + 2000;
     }
 
 
@@ -471,12 +472,18 @@ void loop() {
             stepper.setCurrentPosition(posChoque);
             targetPos = posChoque;
             oled.mostrarMensaje("STALL!", 2);
-            tiempoMensajeHasta = millis() + 2000;
         }
     }
 
     stepper.moveTo(targetPos);
     stepper.run();
+
+    // Un movimiento que empieza (por USB, BLE, ALPACA o encoder) también quita
+    // el aviso. Solo el arranque: la frenada tras un STOP no cuenta.
+    static bool moviendoAntes = false;
+    bool moviendoAhora = stepper.distanceToGo() != 0;
+    if (moviendoAhora && !moviendoAntes) oled.despertar();
+    moviendoAntes = moviendoAhora;
 
     // 4. Guardar posición en EEPROM al detenerse tras un breve retraso
     if (stepper.distanceToGo() == 0 && targetPos != ultimaPosGuardada) {
@@ -505,9 +512,13 @@ void loop() {
         return;
     }
 
-    if (millis() < tiempoMensajeHasta) {
-         // No actualizamos la pantalla normal mientras dure el mensaje
-         return;
+    if (oled.mostrandoMensaje()) {
+        // El aviso se queda hasta que haya interacción o movimiento nuevo
+        if (millis() - ultimaActualizacionOled > 250) {
+            oled.refrescarMensaje();
+            ultimaActualizacionOled = millis();
+        }
+        return;
     }
 
     if (millis() - ultimaActualizacionOled > 250) {

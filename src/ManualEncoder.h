@@ -28,6 +28,10 @@ public:
     // se movía), y limpia el flag.
     bool checkStopRequest();
 
+    // Devuelve true si se ha girado el encoder, pulsado S1/S2 o empezado a
+    // pulsar el botón desde la última llamada, y limpia el flag.
+    bool checkActividad();
+
     // isMoving indica si el motor está en marcha en este instante: si lo
     // está, una pulsación corta detiene en vez de cambiar el multiplicador.
     long getUpdatedPosition(long currentTarget, bool isMoving);
@@ -38,6 +42,7 @@ private:
     EncoderState _currentState;
     bool _resetRequested;
     bool _stopRequested;
+    bool _actividad;
 
     // Variables para polling del encoder
     int _lastClkState;
